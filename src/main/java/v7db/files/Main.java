@@ -43,7 +43,14 @@ public class Main {
 
 		ServletHandler handler = new ServletHandler();
 		handler.setServletInstance(new MiltonServlet());
-		handler.setServletPath("/*");
+
+		String endpoint = params.getProperty("v7files.endpoints");
+		if ("/".equals(endpoint)) {
+			handler.setContextPath("");
+		} else {
+			handler.setContextPath(endpoint);
+		}
+		handler.addInitParameter("v7files.endpoint", endpoint);
 		handler.addInitParameter("resource.factory.factory.class", params
 				.getProperty("resource.factory.factory.class"));
 		final HttpServer server = new HttpServer();
