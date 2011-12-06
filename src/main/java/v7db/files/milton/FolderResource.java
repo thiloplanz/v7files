@@ -60,7 +60,7 @@ public class FolderResource extends FileResource implements CollectionResource,
 
 		V7File file = getFile();
 		V7File child = file.createChild(IOUtils.toByteArray(inputStream),
-				newName);
+				newName, contentType);
 
 		return new FileResource(child);
 	}
@@ -71,7 +71,7 @@ public class FolderResource extends FileResource implements CollectionResource,
 		V7File file = getFile();
 		V7File child;
 		try {
-			child = file.createChild(null, newName);
+			child = file.createChild(null, newName, null);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}

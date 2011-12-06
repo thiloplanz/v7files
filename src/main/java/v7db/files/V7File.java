@@ -50,22 +50,6 @@ public class V7File {
 			gridFile = gridFS.findContent(getSha());
 	}
 
-	// else if ( key.equals( "_id" ) )
-	// return _id;
-	// else if ( key.equals( "filename" ) )
-	// return _filename;
-	// else if ( key.equals( "contentType" ) )
-	// return _contentType;
-	// else if ( key.equals( "length" ) )
-	// return _length;
-	// else if ( key.equals( "chunkSize" ) )
-	// return _chunkSize;
-	// else if ( key.equals( "uploadDate" ) )
-	// return _uploadDate;
-	// else if ( key.equals( "md5" ) )
-	// return _md5;
-	// return _extradata.get( key );
-
 	public String getContentType() {
 		Object x = metaData.get("contentType");
 		if (x instanceof String)
@@ -119,8 +103,9 @@ public class V7File {
 		return gridFS.getChildren(getId());
 	}
 
-	public V7File createChild(byte[] data, String filename) throws IOException {
-		Object childId = gridFS.addFile(data, getId(), filename);
+	public V7File createChild(byte[] data, String filename, String contentType)
+			throws IOException {
+		Object childId = gridFS.addFile(data, getId(), filename, contentType);
 		return new V7File(gridFS, childId);
 	}
 

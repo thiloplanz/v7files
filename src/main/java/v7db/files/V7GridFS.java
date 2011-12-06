@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
@@ -107,11 +108,14 @@ public class V7GridFS {
 	 * @return
 	 * @throws IOException
 	 */
-	public Object addFile(byte[] data, Object parentFileId, String filename)
+	public Object addFile(byte[] data, Object parentFileId, String filename, String contentType)
 			throws IOException {
 		BasicDBObject metaData = new BasicDBObject("filename", filename)
 				.append("_version", 1).append("parent", parentFileId);
 
+		if (StringUtils.isNotBlank(contentType))
+			metaData.append("contentType", contentType);
+		
 		if (data != null) {
 			byte[] sha = DigestUtils.sha(data);
 
