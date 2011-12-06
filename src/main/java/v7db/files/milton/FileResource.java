@@ -18,6 +18,7 @@
 package v7db.files.milton;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Date;
 import java.util.Map;
@@ -68,7 +69,10 @@ class FileResource implements GetableResource, PropFindableResource,
 	public void sendContent(OutputStream out, Range range,
 			Map<String, String> params, String contentType) throws IOException,
 			NotAuthorizedException, BadRequestException, NotFoundException {
-		IOUtils.copy(file.getInputStream(), out);
+		InputStream content = file.getInputStream();
+		if (content == null)
+			throw new BadRequestException("file has no contents");
+		IOUtils.copy(content, out);
 	}
 
 	public Object authenticate(String user, String password) {

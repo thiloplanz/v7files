@@ -85,6 +85,8 @@ public class V7File {
 	}
 
 	public InputStream getInputStream() {
+		if (getSha() == null)
+			return null;
 		loadGridFile();
 		return gridFile.getInputStream();
 	}
