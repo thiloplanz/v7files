@@ -37,19 +37,18 @@ import com.bradmcevoy.http.exceptions.NotAuthorizedException;
 public class FolderResource extends FileResource implements CollectionResource,
 		PutableResource, MakeCollectionableResource {
 
-	FolderResource(V7File file) {
-		super(file);
+	FolderResource(V7File file, ResourceFactory factory) {
+		super(file, factory);
 	}
 
 	public List<? extends Resource> getChildren() {
-		V7File file = getFile();
 		List<V7File> children = file.getChildren();
 		List<FileResource> result = new ArrayList<FileResource>(children.size());
 		for (V7File child : children) {
 			if (child.hasContent())
-				result.add(new FileResource(child));
+				result.add(new FileResource(child, factory));
 			else
-				result.add(new FolderResource(child));
+				result.add(new FolderResource(child, factory));
 		}
 		return result;
 	}
@@ -58,24 +57,30 @@ public class FolderResource extends FileResource implements CollectionResource,
 			Long length, String contentType) throws IOException,
 			ConflictException, NotAuthorizedException, BadRequestException {
 
-		V7File file = getFile();
 		V7File child = file.createChild(IOUtils.toByteArray(inputStream),
 				newName, contentType);
 
-		return new FileResource(child);
+		return new FileResource(child, factory);
 	}
 
 	public CollectionResource createCollection(String newName)
 			throws NotAuthorizedException, ConflictException,
 			BadRequestException {
-		V7File file = getFile();
 		V7File child;
 		try {
 			child = file.createChild(null, newName, null);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-		return new FolderResource(child);
+		return new FolderResource(child, factory);
 	}
 
+	public Resource child(String childName) {
+		V7File child = file.getChild(childName);
+		if (child == null)
+			return null;
+		if (child.hasContent())
+			return new FileResource(child, factory);
+		return new FolderResource(child, factory);
+	}
 }

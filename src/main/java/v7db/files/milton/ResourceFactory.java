@@ -44,10 +44,9 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			endpoint = config.getInitParameter("v7files.endpoint");
 
 			mongo = Configuration.getMongo(endpoint);
-			fs = new V7GridFS(mongo.getDB(Configuration.getEndpointProperty(
-					endpoint, "mongo.db")));
+			fs = new V7GridFS(mongo.getDB(getProperty("mongo.db")));
 
-			ROOT = Configuration.getEndpointProperty(endpoint, "root");
+			ROOT = getProperty("root");
 			if (ROOT == null)
 				ROOT = endpoint;
 		} catch (Exception e) {
@@ -73,15 +72,27 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			return null;
 
 		if (f.hasContent())
-			return new FileResource(f);
+			return new FileResource(f, this);
 
-		return new FolderResource(f);
+		return new FolderResource(f, this);
 	}
 
 	public void destroy(HttpManager manager) {
 		if (mongo != null)
 			mongo.close();
 
+	}
+
+	String getProperty(String name) {
+		return Configuration.getEndpointProperty(endpoint, name);
+	}
+
+	String getAnonymousUser() {
+		return getProperty("auth.anonymous");
+	}
+
+	String getRealm() {
+		return getProperty("auth.realm");
 	}
 
 }

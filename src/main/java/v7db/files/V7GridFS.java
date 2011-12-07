@@ -51,12 +51,13 @@ public class V7GridFS {
 	public V7File getFile(String[] path) {
 
 		// the filesystem root
+		V7File parentFile = new V7File(this, path[0]);
+
 		if (path.length == 1) {
-			return new V7File(this, path[0]);
+			return parentFile;
 		}
 
 		DBObject metaData;
-
 		// directly under the root
 		if (path.length == 2) {
 			metaData = files.findOne(new BasicDBObject("parent", path[0])
@@ -74,6 +75,7 @@ public class V7GridFS {
 				return null;
 
 			Object parent = path[0];
+
 			metaData = null;
 			path: for (String fileName : filenames) {
 				for (DBObject c : candidates) {
@@ -81,6 +83,7 @@ public class V7GridFS {
 							&& fileName.equals(c.get("filename"))) {
 						parent = c.get("_id");
 						metaData = c;
+						parentFile = new V7File(this, metaData, parentFile);
 						continue path;
 					}
 				}
@@ -90,7 +93,7 @@ public class V7GridFS {
 
 		if (metaData == null)
 			return null;
-		return new V7File(this, metaData);
+		return new V7File(this, metaData, parentFile);
 	}
 
 	GridFSDBFile findContent(byte[] sha) {
@@ -149,5 +152,14 @@ public class V7GridFS {
 		String error = result.getError();
 		if (error != null)
 			throw new IOException(error);
+	}
+
+	public V7File getChild(Object parentFileId, String childName) {
+		DBObject child = files
+				.findOne(new BasicDBObject("parent", parentFileId).append(
+						"filename", childName));
+		if (child == null)
+			return null;
+		return new V7File(this, child);
 	}
 }

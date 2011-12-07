@@ -61,6 +61,7 @@ public class Main {
 		handler.addInitParameter("v7files.endpoint", endpoint);
 		handler.addInitParameter("resource.factory.factory.class",
 				Configuration.getProperty("resource.factory.factory.class"));
+
 		final HttpServer server = new HttpServer();
 		int port = Integer.parseInt(Configuration.getProperty("http.port"));
 		String host = NetworkListener.DEFAULT_NETWORK_HOST;

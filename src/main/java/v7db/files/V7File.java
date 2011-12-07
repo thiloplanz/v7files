@@ -37,13 +37,16 @@ public class V7File {
 
 	private final DBObject metaData;
 
-	V7File(V7GridFS gridFS, DBObject metaData) {
+	private final V7File parent;
+
+	V7File(V7GridFS gridFS, DBObject metaData, V7File parent) {
 		this.gridFS = gridFS;
 		this.metaData = metaData;
+		this.parent = parent;
 	}
 
 	V7File(V7GridFS gridFS, Object fileId) {
-		this(gridFS, new BasicDBObject("_id", fileId));
+		this(gridFS, new BasicDBObject("_id", fileId), null);
 	}
 
 	private void loadGridFile() {
@@ -104,6 +107,14 @@ public class V7File {
 		return gridFS.getChildren(getId());
 	}
 
+	public V7File getChild(String childName) {
+		return gridFS.getChild(getId(), childName);
+	}
+
+	public V7File getParent() {
+		return parent;
+	}
+
 	public V7File createChild(byte[] data, String filename, String contentType)
 			throws IOException {
 		Object childId = gridFS.addFile(data, getId(), filename, contentType);
@@ -122,4 +133,5 @@ public class V7File {
 	public Date getCreateDate() {
 		return (Date) metaData.get("created_at");
 	}
+
 }

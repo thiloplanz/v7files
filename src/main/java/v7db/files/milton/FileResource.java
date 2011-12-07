@@ -24,6 +24,7 @@ import java.util.Date;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import v7db.files.V7File;
 
@@ -43,14 +44,13 @@ import com.bradmcevoy.http.exceptions.NotFoundException;
 class FileResource implements GetableResource, PropFindableResource,
 		MoveableResource {
 
-	private final V7File file;
+	final V7File file;
 
-	FileResource(V7File file) {
+	final ResourceFactory factory;
+
+	FileResource(V7File file, ResourceFactory factory) {
 		this.file = file;
-	}
-
-	V7File getFile() {
-		return file;
+		this.factory = factory;
 	}
 
 	public Long getContentLength() {
@@ -62,7 +62,6 @@ class FileResource implements GetableResource, PropFindableResource,
 	}
 
 	public Long getMaxAgeSeconds(Auth auth) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
@@ -76,11 +75,16 @@ class FileResource implements GetableResource, PropFindableResource,
 	}
 
 	public Object authenticate(String user, String password) {
-		return user;
+		return null;
 	}
 
 	public boolean authorise(Request request, Method method, Auth auth) {
-		return true;
+		String user = factory.getAnonymousUser();
+		if (StringUtils.isBlank(user))
+			return false;
+
+		// for now, just endpoint global settings, no per-file settings yet
+		return (StringUtils.contains(factory.getProperty("acl.read"), user));
 	}
 
 	public String checkRedirect(Request request) {
@@ -100,8 +104,7 @@ class FileResource implements GetableResource, PropFindableResource,
 	}
 
 	public String getRealm() {
-		// TODO Auto-generated method stub
-		return null;
+		return factory.getRealm();
 	}
 
 	public String getUniqueId() {
@@ -110,11 +113,6 @@ class FileResource implements GetableResource, PropFindableResource,
 
 	public Date getCreateDate() {
 		return file.getCreateDate();
-	}
-
-	public com.bradmcevoy.http.Resource child(String childName) {
-		// TODO Auto-generated method stub
-		return null;
 	}
 
 	public void moveTo(CollectionResource rDest, String name)
