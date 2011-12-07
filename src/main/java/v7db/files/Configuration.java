@@ -21,21 +21,39 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Properties;
 
+import org.apache.log4j.PropertyConfigurator;
+
 import com.mongodb.Mongo;
 import com.mongodb.MongoException;
 
 public class Configuration {
 
-	public static final Properties getProperties() throws IOException {
-		Properties params = new Properties();
-		params.load(Main.class.getResourceAsStream("defaults.properties"));
-		params.putAll(System.getProperties());
+	private static final Properties props = new Properties();
 
-		return params;
+	static void init(Properties settings) throws IOException {
+		props.clear();
+		props.load(Main.class.getResourceAsStream("defaults.properties"));
+		if (settings != null)
+			props.putAll(settings);
+		props.putAll(System.getProperties());
+		// configure Log4j
+		PropertyConfigurator.configure(props);
 	}
 
-	public static final Mongo getMongo() throws UnknownHostException,
-			MongoException {
+	public static String getProperty(String key) {
+		return props.getProperty(key);
+	}
+
+	public static String getEndpointProperty(String endpoint, String key) {
+		String p = props
+				.getProperty("v7files.endpoint." + endpoint + "." + key);
+		if (p == null)
+			return getProperty(key);
+		return p;
+	}
+
+	public static final Mongo getMongo(String endpoint)
+			throws UnknownHostException, MongoException {
 		Mongo mongo = new Mongo();
 		return mongo;
 	}

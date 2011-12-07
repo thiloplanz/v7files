@@ -41,12 +41,15 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	public void init(ApplicationConfig config, HttpManager manager) {
 		try {
-			mongo = Configuration.getMongo();
-			fs = new V7GridFS(mongo.getDB("test"));
 			endpoint = config.getInitParameter("v7files.endpoint");
 
-			ROOT = Configuration.getProperties().getProperty(
-					"v7files.endpoint." + endpoint + ".root", endpoint);
+			mongo = Configuration.getMongo(endpoint);
+			fs = new V7GridFS(mongo.getDB(Configuration.getEndpointProperty(
+					endpoint, "mongo.db")));
+
+			ROOT = Configuration.getEndpointProperty(endpoint, "root");
+			if (ROOT == null)
+				ROOT = endpoint;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}

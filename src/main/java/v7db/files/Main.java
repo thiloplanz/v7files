@@ -17,10 +17,11 @@
 
 package v7db.files;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.apache.log4j.PropertyConfigurator;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.NetworkListener;
 import org.glassfish.grizzly.http.server.ServerConfiguration;
@@ -36,25 +37,32 @@ public class Main {
 	 */
 	public static void main(String[] args) throws IOException {
 
-		Properties params = Configuration.getProperties();
-
-		// configure Log4j
-		PropertyConfigurator.configure(params);
+		if (args.length == 2 && "-f".equals(args[0])) {
+			File configFile = new File(args[1]);
+			Properties config = new Properties();
+			config.load(new FileInputStream(configFile));
+			Configuration.init(config);
+		} else if (args.length == 0) {
+			Configuration.init(null);
+		} else {
+			System.err.println("v7files [-f config.properties]");
+			System.exit(1);
+		}
 
 		ServletHandler handler = new ServletHandler();
 		handler.setServletInstance(new MiltonServlet());
 
-		String endpoint = params.getProperty("v7files.endpoints");
+		String endpoint = Configuration.getProperty("v7files.endpoints");
 		if ("/".equals(endpoint)) {
 			handler.setContextPath("");
 		} else {
 			handler.setContextPath(endpoint);
 		}
 		handler.addInitParameter("v7files.endpoint", endpoint);
-		handler.addInitParameter("resource.factory.factory.class", params
-				.getProperty("resource.factory.factory.class"));
+		handler.addInitParameter("resource.factory.factory.class",
+				Configuration.getProperty("resource.factory.factory.class"));
 		final HttpServer server = new HttpServer();
-		int port = Integer.parseInt(params.getProperty("http.port"));
+		int port = Integer.parseInt(Configuration.getProperty("http.port"));
 		String host = NetworkListener.DEFAULT_NETWORK_HOST;
 		final NetworkListener listener = new NetworkListener("grizzly", host,
 				port);
