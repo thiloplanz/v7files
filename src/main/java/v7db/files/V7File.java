@@ -19,6 +19,7 @@ package v7db.files;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Hex;
@@ -112,5 +113,13 @@ public class V7File {
 	public void rename(String newName) throws IOException {
 		metaData.put("filename", newName);
 		gridFS.updateMetaData(metaData);
+	}
+
+	public Date getModifiedDate() {
+		return (Date) metaData.get("updated_at");
+	}
+
+	public Date getCreateDate() {
+		return (Date) metaData.get("created_at");
 	}
 }

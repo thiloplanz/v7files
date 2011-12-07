@@ -20,6 +20,7 @@ package v7db.files;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -108,14 +109,15 @@ public class V7GridFS {
 	 * @return
 	 * @throws IOException
 	 */
-	public Object addFile(byte[] data, Object parentFileId, String filename, String contentType)
-			throws IOException {
+	public Object addFile(byte[] data, Object parentFileId, String filename,
+			String contentType) throws IOException {
 		BasicDBObject metaData = new BasicDBObject("filename", filename)
-				.append("_version", 1).append("parent", parentFileId);
+				.append("_version", 1).append("parent", parentFileId).append(
+						"created_at", new Date());
 
 		if (StringUtils.isNotBlank(contentType))
 			metaData.append("contentType", contentType);
-		
+
 		if (data != null) {
 			byte[] sha = DigestUtils.sha(data);
 

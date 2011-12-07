@@ -89,8 +89,10 @@ class FileResource implements GetableResource, PropFindableResource,
 	}
 
 	public Date getModifiedDate() {
-		// TODO Auto-generated method stub
-		return null;
+		Date d = file.getModifiedDate();
+		if (d == null)
+			return file.getCreateDate();
+		return d;
 	}
 
 	public String getName() {
@@ -107,8 +109,7 @@ class FileResource implements GetableResource, PropFindableResource,
 	}
 
 	public Date getCreateDate() {
-		// TODO Auto-generated method stub
-		return null;
+		return file.getCreateDate();
 	}
 
 	public com.bradmcevoy.http.Resource child(String childName) {
