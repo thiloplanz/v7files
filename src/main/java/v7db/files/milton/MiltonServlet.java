@@ -20,6 +20,12 @@ package v7db.files.milton;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 
+import com.bradmcevoy.http.AuthenticationService;
+import com.bradmcevoy.http.Handler;
+import com.bradmcevoy.http.HttpExtension;
+import com.bradmcevoy.http.http11.Http11Protocol;
+import com.bradmcevoy.http.webdav.DefaultWebDavResponseHandler;
+
 public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 
 	@Override
@@ -27,6 +33,23 @@ public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 		super.init(config);
 		// http://stackoverflow.com/questions/8380324/
 		httpManager.getHandlers().setEnableExpectContinue(false);
+
+		// http://jira.ettrema.com:8080/browse/MIL-11
+
+		handlers: for (HttpExtension x : httpManager.getHandlers()) {
+			if (x instanceof Http11Protocol) {
+				Http11Protocol p = (Http11Protocol) x;
+				for (Handler h : x.getHandlers()) {
+					if (h instanceof com.bradmcevoy.http.http11.GetHandler) {
+						httpManager.addFilter(0, new GetHandler(
+								new DefaultWebDavResponseHandler(
+										new AuthenticationService()), p
+										.getHandlerHelper()));
+						break handlers;
+					}
+				}
+			}
+		}
 	}
 
 }
