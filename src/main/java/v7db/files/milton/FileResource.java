@@ -24,7 +24,6 @@ import java.util.Date;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 
 import v7db.files.V7File;
 
@@ -75,16 +74,11 @@ class FileResource implements GetableResource, PropFindableResource,
 	}
 
 	public Object authenticate(String user, String password) {
-		return null;
+		return factory.authenticate(user, password);
 	}
 
 	public boolean authorise(Request request, Method method, Auth auth) {
-		String user = factory.getAnonymousUser();
-		if (StringUtils.isBlank(user))
-			return false;
-
-		// for now, just endpoint global settings, no per-file settings yet
-		return (StringUtils.contains(factory.getProperty("acl.read"), user));
+		return factory.authorise(request, method, auth);
 	}
 
 	public String checkRedirect(Request request) {

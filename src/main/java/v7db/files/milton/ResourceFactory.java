@@ -18,15 +18,25 @@
 package v7db.files.milton;
 
 import static org.apache.commons.lang3.StringUtils.substringAfter;
+
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+
+import v7db.auth.AuthenticationProvider;
+import v7db.auth.AuthenticationProviderFactory;
+import v7db.auth.AuthenticationToken;
 import v7db.files.Configuration;
 import v7db.files.V7File;
 import v7db.files.V7GridFS;
 
 import com.bradmcevoy.http.ApplicationConfig;
+import com.bradmcevoy.http.Auth;
 import com.bradmcevoy.http.HttpManager;
 import com.bradmcevoy.http.Initable;
 import com.bradmcevoy.http.MiltonServlet;
+import com.bradmcevoy.http.Request;
 import com.bradmcevoy.http.Resource;
+import com.bradmcevoy.http.Request.Method;
 import com.mongodb.Mongo;
 
 class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
@@ -39,6 +49,8 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private String endpoint;
 
+	private AuthenticationProvider authentication;
+
 	public void init(ApplicationConfig config, HttpManager manager) {
 		try {
 			endpoint = config.getInitParameter("v7files.endpoint");
@@ -49,6 +61,9 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			ROOT = getProperty("root");
 			if (ROOT == null)
 				ROOT = endpoint;
+
+			authentication = AuthenticationProviderFactory
+					.getProvider(Configuration.getProperties());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -87,12 +102,45 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		return Configuration.getEndpointProperty(endpoint, name);
 	}
 
-	String getAnonymousUser() {
+	private String getAnonymousUser() {
 		return getProperty("auth.anonymous");
 	}
 
 	String getRealm() {
 		return getProperty("auth.realm");
+	}
+
+	boolean authorise(Request request, Method method, Auth auth) {
+		AuthenticationToken tag = auth == null ? null
+				: (AuthenticationToken) auth.getTag();
+		Object[] roles;
+		if (tag == null) {
+			String user = getAnonymousUser();
+			if (StringUtils.isBlank(user))
+				return false;
+			roles = new String[] { user };
+		} else {
+			roles = tag.getRoles();
+		}
+		if (method != Request.Method.GET) {
+			return false;
+		}
+		// for now, just endpoint global settings, no per-file settings yet
+		String[] acl = StringUtils.stripAll(StringUtils.split(
+				getProperty("acl.read"), ','));
+		for (Object role : roles) {
+			if (ArrayUtils.contains(acl, role))
+				return true;
+		}
+		return false;
+	}
+
+	AuthenticationToken authenticate(String user, String password) {
+		if (authentication == null)
+			return null;
+
+		return authentication.authenticate(user, password);
+
 	}
 
 }

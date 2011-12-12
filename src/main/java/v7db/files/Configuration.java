@@ -40,6 +40,10 @@ public class Configuration {
 		PropertyConfigurator.configure(props);
 	}
 
+	public static Properties getProperties() {
+		return props;
+	}
+
 	public static String getProperty(String key) {
 		return props.getProperty(key);
 	}
