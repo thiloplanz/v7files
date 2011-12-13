@@ -23,6 +23,9 @@ public class AuthenticationToken {
 
 	private final Object[] roles;
 
+	public static final AuthenticationToken ANONYMOUS = new AuthenticationToken(
+			null);
+
 	public AuthenticationToken(String username, Object... roles) {
 		this.username = username;
 		this.roles = roles;

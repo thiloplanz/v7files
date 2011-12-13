@@ -114,7 +114,7 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		AuthenticationToken tag = auth == null ? null
 				: (AuthenticationToken) auth.getTag();
 		Object[] roles;
-		if (tag == null) {
+		if (tag == null || tag == AuthenticationToken.ANONYMOUS) {
 			String user = getAnonymousUser();
 			if (StringUtils.isBlank(user))
 				return false;
@@ -122,12 +122,26 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		} else {
 			roles = tag.getRoles();
 		}
-		if (method != Request.Method.GET) {
+		switch (method) {
+		case GET:
+			return authorise("acl.read", roles);
+		case PROPFIND:
+			return authorise("acl.read", roles);
+		case POST:
+		case PUT:
+		case MKCOL:
+			return authorise("acl.write", roles);
+		default:
+			System.err.println("acl not implemented for " + method);
 			return false;
 		}
+
+	}
+
+	private boolean authorise(String aclName, Object[] roles) {
 		// for now, just endpoint global settings, no per-file settings yet
 		String[] acl = StringUtils.stripAll(StringUtils.split(
-				getProperty("acl.read"), ','));
+				getProperty(aclName), ','));
 		for (Object role : roles) {
 			if (ArrayUtils.contains(acl, role))
 				return true;
@@ -136,6 +150,12 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 	}
 
 	AuthenticationToken authenticate(String user, String password) {
+		// Cyberduck does BasicAuth with "anonymous"
+		// not sure if that is good, but here we go ...
+		// we cannot return null because that would "fail" the anoymous login
+		if ("anonymous".equals(user))
+			return AuthenticationToken.ANONYMOUS;
+
 		if (authentication == null)
 			return null;
 
