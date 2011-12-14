@@ -58,6 +58,10 @@
 			<id>ettrema-repo</id>
 			<url>http://www.ettrema.com/maven2</url>
 		</repository>
+		<repository>
+			<id>grizzly-repo</id>
+			<url>https://maven.java.net/content/repositories/releases</url>
+		</repository>
 	</repositories>
 
 	<dependencies>
@@ -80,8 +84,8 @@
 		</dependency>
 		<dependency>
 			<groupId>org.glassfish.grizzly</groupId>
-			<artifactId>grizzly-http-servlet-server</artifactId>
-			<version>2.1.7</version>
+			<artifactId>grizzly-http-servlet</artifactId>
+			<version>2.1.8</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
