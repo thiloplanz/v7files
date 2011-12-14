@@ -37,16 +37,13 @@ public class V7File {
 
 	private final DBObject metaData;
 
-	private final V7File parent;
-
-	V7File(V7GridFS gridFS, DBObject metaData, V7File parent) {
+	V7File(V7GridFS gridFS, DBObject metaData) {
 		this.gridFS = gridFS;
 		this.metaData = metaData;
-		this.parent = parent;
 	}
 
-	V7File(V7GridFS gridFS, Object fileId) {
-		this(gridFS, new BasicDBObject("_id", fileId), null);
+	static V7File lazy(V7GridFS gridFS, Object id) {
+		return new V7File(gridFS, new BasicDBObject("_id", id));
 	}
 
 	private void loadGridFile() {
@@ -111,14 +108,10 @@ public class V7File {
 		return gridFS.getChild(getId(), childName);
 	}
 
-	public V7File getParent() {
-		return parent;
-	}
-
 	public V7File createChild(byte[] data, String filename, String contentType)
 			throws IOException {
 		Object childId = gridFS.addFile(data, getId(), filename, contentType);
-		return new V7File(gridFS, childId);
+		return lazy(gridFS, childId);
 	}
 
 	public void rename(String newName) throws IOException {

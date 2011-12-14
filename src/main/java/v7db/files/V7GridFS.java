@@ -48,10 +48,10 @@ public class V7GridFS {
 		fs = new GridFS(db, "v7.fs");
 	}
 
-	public V7File getFile(String[] path) {
+	public V7File getFile(String... path) {
 
 		// the filesystem root
-		V7File parentFile = new V7File(this, path[0]);
+		V7File parentFile = V7File.lazy(this, path[0]);
 
 		if (path.length == 1) {
 			return parentFile;
@@ -83,7 +83,7 @@ public class V7GridFS {
 							&& fileName.equals(c.get("filename"))) {
 						parent = c.get("_id");
 						metaData = c;
-						parentFile = new V7File(this, metaData, parentFile);
+						parentFile = new V7File(this, metaData);
 						continue path;
 					}
 				}
@@ -93,7 +93,7 @@ public class V7GridFS {
 
 		if (metaData == null)
 			return null;
-		return new V7File(this, metaData, parentFile);
+		return new V7File(this, metaData);
 	}
 
 	GridFSDBFile findContent(byte[] sha) {

@@ -37,6 +37,10 @@ import com.bradmcevoy.http.exceptions.NotAuthorizedException;
 public class FolderResource extends FileResource implements CollectionResource,
 		PutableResource, MakeCollectionableResource {
 
+	FolderResource(String name, V7File file, ResourceFactory factory) {
+		super(name, file, factory);
+	}
+
 	FolderResource(V7File file, ResourceFactory factory) {
 		super(file, factory);
 	}

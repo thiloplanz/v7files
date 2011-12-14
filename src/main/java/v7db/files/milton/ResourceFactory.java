@@ -17,7 +17,9 @@
 
 package v7db.files.milton;
 
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.substringAfter;
+import static org.apache.commons.lang3.StringUtils.substringAfterLast;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -49,11 +51,16 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private String endpoint;
 
+	private String endpointName;
+
 	private AuthenticationProvider authentication;
 
 	public void init(ApplicationConfig config, HttpManager manager) {
 		try {
 			endpoint = config.getInitParameter("v7files.endpoint");
+
+			endpointName = defaultIfBlank(substringAfterLast(endpoint, "/"),
+					"/");
 
 			mongo = Configuration.getMongo(endpoint);
 			fs = new V7GridFS(mongo.getDB(getProperty("mongo.db")));
@@ -74,14 +81,14 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 		path = substringAfter(path, MiltonServlet.servletConfig()
 				.getServletContext().getContextPath());
-		String[] p;
 
 		if ("/".equals(path)) {
-			p = new String[] { ROOT };
-		} else {
-			p = path.split("/");
-			p[0] = ROOT;
+			return new FolderResource(endpointName, fs.getFile(ROOT), this);
 		}
+
+		String[] p = path.split("/");
+		p[0] = ROOT;
+
 		V7File f = fs.getFile(p);
 		if (f == null)
 			return null;

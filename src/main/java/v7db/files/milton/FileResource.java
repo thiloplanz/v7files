@@ -47,9 +47,19 @@ class FileResource implements GetableResource, PropFindableResource,
 
 	final ResourceFactory factory;
 
-	FileResource(V7File file, ResourceFactory factory) {
+	// could be different from file.getName()
+	// at least for the endpoint root folders, which needs
+	// to match the URL part
+	final String name;
+
+	FileResource(String name, V7File file, ResourceFactory factory) {
 		this.file = file;
+		this.name = name;
 		this.factory = factory;
+	}
+
+	FileResource(V7File file, ResourceFactory factory) {
+		this(file.getName(), file, factory);
 	}
 
 	public Long getContentLength() {
@@ -94,7 +104,7 @@ class FileResource implements GetableResource, PropFindableResource,
 	}
 
 	public String getName() {
-		return file.getName();
+		return name;
 	}
 
 	public String getRealm() {
