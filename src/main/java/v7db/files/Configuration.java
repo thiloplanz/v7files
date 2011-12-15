@@ -49,8 +49,7 @@ public class Configuration {
 	}
 
 	public static String getEndpointProperty(String endpoint, String key) {
-		String p = props
-				.getProperty("v7files.endpoint." + endpoint + "." + key);
+		String p = props.getProperty(endpoint + "." + key);
 		if (p == null)
 			return getProperty(key);
 		return p;
