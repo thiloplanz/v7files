@@ -74,8 +74,18 @@ public class Main {
 
 		server.start();
 
-		System.in.read();
-		server.stop();
+		try {
+			System.in.read();
+			server.stop();
+		} catch (IOException e) {
+			System.err
+					.println("STDIN unavailable, continue running in daemon mode");
+			try {
+				synchronized (args) {
+					args.wait(); // forever
+				}
+			} catch (InterruptedException e1) {
+			}
+		}
 	}
-
 }
