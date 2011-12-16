@@ -61,10 +61,22 @@ public class FolderResource extends FileResource implements CollectionResource,
 			Long length, String contentType) throws IOException,
 			ConflictException, NotAuthorizedException, BadRequestException {
 
-		V7File child = file.createChild(IOUtils.toByteArray(inputStream),
-				newName, contentType);
+		Resource existingChild = child(newName);
+		if (existingChild == null) {
 
-		return new FileResource(child, factory);
+			V7File child = file.createChild(IOUtils.toByteArray(inputStream),
+					newName, contentType);
+
+			return new FileResource(child, factory);
+		}
+		if (existingChild instanceof FolderResource) {
+			throw new ConflictException(existingChild,
+					"already exists and is a folder");
+		}
+
+		((FileResource) existingChild).file.setContent(IOUtils
+				.toByteArray(inputStream), contentType);
+		return existingChild;
 	}
 
 	public CollectionResource createCollection(String newName)

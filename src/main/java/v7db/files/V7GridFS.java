@@ -172,6 +172,20 @@ public class V7GridFS {
 			throw new IOException(error);
 	}
 
+	void updateContents(DBObject metaData, byte[] contents) throws IOException {
+		byte[] sha = DigestUtils.sha(contents);
+
+		if (!contentAlreadyExists(sha)) {
+			GridFSInputFile file = fs.createFile(contents);
+			file.setFilename((String) metaData.get("filename"));
+			file.put("_id", sha);
+			file.save();
+		}
+		metaData.put("sha", sha);
+		metaData.put("length", contents.length);
+		updateMetaData(metaData);
+	}
+
 	public V7File getChild(Object parentFileId, String childName) {
 		DBObject child = files
 				.findOne(new BasicDBObject("parent", parentFileId).append(

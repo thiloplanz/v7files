@@ -122,8 +122,14 @@ class FileResource implements GetableResource, PropFindableResource,
 	public void moveTo(CollectionResource rDest, String name)
 			throws ConflictException, NotAuthorizedException,
 			BadRequestException {
+
+		FolderResource newParent = (FolderResource) rDest;
+
 		try {
-			file.rename(name);
+			if (newParent.file.getId().equals(file.getParentId()))
+				file.rename(name);
+			else
+				file.moveTo(newParent.file.getId(), name);
 		} catch (IOException e) {
 			System.err.println();
 			throw new ConflictException(this);

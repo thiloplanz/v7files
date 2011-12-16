@@ -58,8 +58,12 @@ public class V7File {
 		return null;
 	}
 
-	Object getId() {
+	public Object getId() {
 		return metaData.get("_id");
+	}
+
+	public Object getParentId() {
+		return metaData.get("parent");
 	}
 
 	public String getName() {
@@ -117,6 +121,16 @@ public class V7File {
 	public void rename(String newName) throws IOException {
 		metaData.put("filename", newName);
 		gridFS.updateMetaData(metaData);
+	}
+
+	public void moveTo(Object newParentId, String newName) throws IOException {
+		metaData.put("parent", newParentId);
+		rename(newName);
+	}
+
+	public void setContent(byte[] data, String contentType) throws IOException {
+		metaData.put("contentType", contentType);
+		gridFS.updateContents(metaData, data);
 	}
 
 	public Date getModifiedDate() {
