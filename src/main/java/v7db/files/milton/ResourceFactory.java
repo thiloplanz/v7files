@@ -126,6 +126,7 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		case POST:
 		case PUT:
 		case MKCOL:
+		case MOVE:
 			return authorisation.authorise(file, tag, "acl.write");
 		default:
 			System.err.println("acl not implemented for " + method);

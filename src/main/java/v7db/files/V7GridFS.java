@@ -115,8 +115,7 @@ public class V7GridFS {
 	public Object addFile(byte[] data, Object parentFileId, String filename,
 			String contentType) throws IOException {
 		BasicDBObject metaData = new BasicDBObject("filename", filename)
-				.append("_version", 1).append("parent", parentFileId).append(
-						"created_at", new Date());
+				.append("parent", parentFileId);
 
 		if (StringUtils.isNotBlank(contentType))
 			metaData.append("contentType", contentType);
@@ -134,7 +133,7 @@ public class V7GridFS {
 
 		}
 
-		updateMetaData(metaData);
+		insertMetaData(metaData);
 		return metaData.get("_id");
 	}
 
@@ -147,8 +146,27 @@ public class V7GridFS {
 		return children;
 	}
 
+	private void insertMetaData(DBObject metaData) throws IOException {
+		metaData.put("_version", 1);
+		metaData.put("created_at", new Date());
+		WriteResult result = files.insert(metaData);
+		String error = result.getError();
+		if (error != null)
+			throw new IOException(error);
+	}
+
+	private int increaseVersion(DBObject metaData) {
+		int oldVersion = ((Number) metaData.get("_version")).intValue();
+		metaData.put("_version", oldVersion + 1);
+		metaData.put("updated_at", new Date());
+		return oldVersion;
+	}
+
 	void updateMetaData(DBObject metaData) throws IOException {
-		WriteResult result = files.save(metaData);
+		int oldVersion = increaseVersion(metaData);
+
+		WriteResult result = files.update(new BasicDBObject("_id", metaData
+				.get("_id")).append("_version", oldVersion), metaData);
 		String error = result.getError();
 		if (error != null)
 			throw new IOException(error);
