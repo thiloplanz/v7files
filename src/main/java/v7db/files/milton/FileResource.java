@@ -88,7 +88,7 @@ class FileResource implements GetableResource, PropFindableResource,
 	}
 
 	public boolean authorise(Request request, Method method, Auth auth) {
-		return factory.authorise(request, method, auth);
+		return factory.authorise(file, request, method, auth);
 	}
 
 	public String checkRedirect(Request request) {

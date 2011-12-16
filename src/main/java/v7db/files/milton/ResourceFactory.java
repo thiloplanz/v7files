@@ -20,13 +20,10 @@ package v7db.files.milton;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.substringAfter;
 import static org.apache.commons.lang3.StringUtils.substringAfterLast;
-
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-
+import v7db.auth.AuthFactory;
 import v7db.auth.AuthenticationProvider;
-import v7db.auth.AuthenticationProviderFactory;
 import v7db.auth.AuthenticationToken;
+import v7db.auth.AuthorisationProvider;
 import v7db.files.Configuration;
 import v7db.files.V7File;
 import v7db.files.V7GridFS;
@@ -55,6 +52,8 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private AuthenticationProvider authentication;
 
+	private AuthorisationProvider authorisation;
+
 	public void init(ApplicationConfig config, HttpManager manager) {
 		try {
 			endpoint = config.getInitParameter("v7files.endpoint");
@@ -69,8 +68,11 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			if (ROOT == null)
 				ROOT = endpoint;
 
-			authentication = AuthenticationProviderFactory
-					.getProvider(Configuration.getProperties());
+			authentication = AuthFactory
+					.getAuthenticationProvider(Configuration.getProperties());
+
+			authorisation = AuthFactory.getAuthorisationProvider(Configuration
+					.getProperties(), endpoint);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -109,35 +111,22 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		return Configuration.getEndpointProperty(endpoint, name);
 	}
 
-	private String getAnonymousUser() {
-		return getProperty("auth.anonymous");
-	}
-
 	String getRealm() {
 		return getProperty("auth.realm");
 	}
 
-	boolean authorise(Request request, Method method, Auth auth) {
+	boolean authorise(V7File file, Request request, Method method, Auth auth) {
 		AuthenticationToken tag = auth == null ? null
 				: (AuthenticationToken) auth.getTag();
-		Object[] roles;
-		if (tag == null || tag == AuthenticationToken.ANONYMOUS) {
-			String user = getAnonymousUser();
-			if (StringUtils.isBlank(user))
-				return false;
-			roles = new String[] { user };
-		} else {
-			roles = tag.getRoles();
-		}
 		switch (method) {
 		case GET:
-			return authorise("acl.read", roles);
+			return authorisation.authorise(file, tag, "acl.read");
 		case PROPFIND:
-			return authorise("acl.read", roles);
+			return authorisation.authorise(file, tag, "acl.read");
 		case POST:
 		case PUT:
 		case MKCOL:
-			return authorise("acl.write", roles);
+			return authorisation.authorise(file, tag, "acl.write");
 		default:
 			System.err.println("acl not implemented for " + method);
 			return false;
@@ -145,21 +134,10 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	}
 
-	private boolean authorise(String aclName, Object[] roles) {
-		// for now, just endpoint global settings, no per-file settings yet
-		String[] acl = StringUtils.stripAll(StringUtils.split(
-				getProperty(aclName), ','));
-		for (Object role : roles) {
-			if (ArrayUtils.contains(acl, role))
-				return true;
-		}
-		return false;
-	}
-
 	AuthenticationToken authenticate(String user, String password) {
 		// Cyberduck does BasicAuth with "anonymous"
 		// not sure if that is good, but here we go ...
-		// we cannot return null because that would "fail" the anoymous login
+		// we cannot return null because that would "fail" the anonymous login
 		if ("anonymous".equals(user))
 			return AuthenticationToken.ANONYMOUS;
 

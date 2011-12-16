@@ -17,22 +17,31 @@
 
 package v7db.auth;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.split;
+import static org.apache.commons.lang3.StringUtils.stripAll;
+
 import java.util.Properties;
 
-import org.apache.commons.lang3.StringUtils;
+class DemoAuthenticationProvider implements AuthenticationProvider {
 
-import v7db.auth.demo.DemoAuthenticationProvider;
+	private final Properties props;
 
-public class AuthenticationProviderFactory {
+	DemoAuthenticationProvider(Properties props) {
+		this.props = props;
+	}
 
-	public static AuthenticationProvider getProvider(Properties props) {
-		String p = props.getProperty("auth.provider");
-		if (StringUtils.isBlank(p))
+	public AuthenticationToken authenticate(String username, String password) {
+		if (isBlank(username) || isBlank(password))
 			return null;
-		if ("demo".equals(p)) {
-			return new DemoAuthenticationProvider(props);
-		}
-		throw new SecurityException("no such authentication provider " + p);
+		String checkPassword = props.getProperty("auth.demo.user." + username
+				+ ".password");
+		if (!password.equals(checkPassword))
+			return null;
+
+		return new AuthenticationToken(username,
+				(Object[]) stripAll(split(props.getProperty("auth.demo.user."
+						+ username + ".roles"), ',')));
 	}
 
 }
