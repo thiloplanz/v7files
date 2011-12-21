@@ -141,4 +141,8 @@ public class V7File {
 		return (Date) metaData.get("created_at");
 	}
 
+	public void delete() {
+		gridFS.delete(metaData);
+	}
+
 }

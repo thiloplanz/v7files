@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.BSONObject;
 import org.bson.types.ObjectId;
 
 import com.mongodb.BasicDBObject;
@@ -165,6 +166,11 @@ public class V7GridFS {
 			throw new IOException(error);
 	}
 
+	private DBObject thisVersion(BSONObject metaData) {
+		return new BasicDBObject("_id", metaData.get("_id")).append("_version",
+				metaData.get("_version"));
+	}
+
 	private int increaseVersion(DBObject metaData) {
 		int oldVersion = ((Number) metaData.get("_version")).intValue();
 		metaData.put("_version", oldVersion + 1);
@@ -173,10 +179,10 @@ public class V7GridFS {
 	}
 
 	void updateMetaData(DBObject metaData) throws IOException {
-		int oldVersion = increaseVersion(metaData);
+		DBObject old = thisVersion(metaData);
+		increaseVersion(metaData);
 
-		WriteResult result = files.update(new BasicDBObject("_id", metaData
-				.get("_id")).append("_version", oldVersion), metaData);
+		WriteResult result = files.update(old, metaData);
 		String error = result.getError();
 		if (error != null)
 			throw new IOException(error);
@@ -226,5 +232,12 @@ public class V7GridFS {
 		if (child == null)
 			return null;
 		return new V7File(this, child);
+	}
+
+	void delete(DBObject metaData) {
+		byte[] oldSha = (byte[]) metaData.get("sha");
+		WriteResult r = files.remove(thisVersion(metaData));
+		if (r.getN() > 0)
+			removeRef(oldSha, metaData.get("_id"));
 	}
 }
