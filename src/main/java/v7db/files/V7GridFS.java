@@ -85,7 +85,7 @@ public class V7GridFS {
 							&& fileName.equals(c.get("filename"))) {
 						parent = c.get("_id");
 						metaData = c;
-						parentFile = new V7File(this, metaData);
+						parentFile = new V7File(this, metaData, parentFile);
 						continue path;
 					}
 				}
@@ -95,7 +95,7 @@ public class V7GridFS {
 
 		if (metaData == null)
 			return null;
-		return new V7File(this, metaData);
+		return new V7File(this, metaData, parentFile);
 	}
 
 	GridFSDBFile findContent(byte[] sha) {
@@ -131,11 +131,11 @@ public class V7GridFS {
 		return metaData.get("_id");
 	}
 
-	public List<V7File> getChildren(Object parentFileId) {
+	public List<V7File> getChildren(V7File parent) {
 		List<V7File> children = new ArrayList<V7File>();
-		for (DBObject child : files.find(new BasicDBObject("parent",
-				parentFileId))) {
-			children.add(new V7File(this, child));
+		for (DBObject child : files.find(new BasicDBObject("parent", parent
+				.getId()))) {
+			children.add(new V7File(this, child, parent));
 		}
 		return children;
 	}
@@ -225,13 +225,12 @@ public class V7GridFS {
 		removeRef(oldSha, metaData.get("_id"));
 	}
 
-	public V7File getChild(Object parentFileId, String childName) {
-		DBObject child = files
-				.findOne(new BasicDBObject("parent", parentFileId).append(
-						"filename", childName));
+	public V7File getChild(V7File parentFile, String childName) {
+		DBObject child = files.findOne(new BasicDBObject("parent", parentFile
+				.getId()).append("filename", childName));
 		if (child == null)
 			return null;
-		return new V7File(this, child);
+		return new V7File(this, child, parentFile);
 	}
 
 	void delete(DBObject metaData) {

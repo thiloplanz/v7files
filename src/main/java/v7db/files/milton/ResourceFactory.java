@@ -20,10 +20,11 @@ package v7db.files.milton;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.substringAfter;
 import static org.apache.commons.lang3.StringUtils.substringAfterLast;
-import v7db.auth.AuthFactory;
 import v7db.auth.AuthenticationProvider;
+import v7db.auth.AuthenticationProviderFactory;
 import v7db.auth.AuthenticationToken;
-import v7db.auth.AuthorisationProvider;
+import v7db.files.AuthorisationProvider;
+import v7db.files.AuthorisationProviderFactory;
 import v7db.files.Configuration;
 import v7db.files.V7File;
 import v7db.files.V7GridFS;
@@ -68,11 +69,12 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			if (ROOT == null)
 				ROOT = endpoint;
 
-			authentication = AuthFactory
+			authentication = AuthenticationProviderFactory
 					.getAuthenticationProvider(Configuration.getProperties());
 
-			authorisation = AuthFactory.getAuthorisationProvider(Configuration
-					.getProperties(), endpoint);
+			authorisation = AuthorisationProviderFactory
+					.getAuthorisationProvider(Configuration.getProperties(),
+							endpoint);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -120,15 +122,14 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 				: (AuthenticationToken) auth.getTag();
 		switch (method) {
 		case GET:
-			return authorisation.authorise(file, tag, "acl.read");
 		case PROPFIND:
-			return authorisation.authorise(file, tag, "acl.read");
+			return authorisation.authoriseRead(file, tag);
 		case POST:
 		case PUT:
 		case MKCOL:
 		case MOVE:
 		case DELETE:
-			return authorisation.authorise(file, tag, "acl.write");
+			return authorisation.authoriseWrite(file, tag);
 		default:
 			System.err.println("acl not implemented for " + method);
 			return false;

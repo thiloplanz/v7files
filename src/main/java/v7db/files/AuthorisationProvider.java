@@ -15,13 +15,25 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.auth;
+package v7db.files;
 
-import v7db.files.V7File;
+import v7db.auth.AuthenticationToken;
 
 public interface AuthorisationProvider {
 
-	boolean authorise(V7File resource, AuthenticationToken user,
-			String permission);
+	/**
+	 * check permissions for read access
+	 */
+	boolean authoriseRead(V7File resource, AuthenticationToken user);
+
+	/**
+	 * check permissions for write access
+	 */
+	boolean authoriseWrite(V7File resource, AuthenticationToken user);
+
+	/**
+	 * check permissions to open a folder (to access files within)
+	 */
+	boolean authoriseOpen(V7File resource, AuthenticationToken user);
 
 }

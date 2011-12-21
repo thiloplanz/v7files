@@ -15,14 +15,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.auth;
+package v7db.files;
 
 import java.util.Properties;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import v7db.files.V7File;
+import v7db.auth.AuthenticationToken;
 
 class GlobalAuthorisationProvider implements AuthorisationProvider {
 
@@ -50,17 +50,28 @@ class GlobalAuthorisationProvider implements AuthorisationProvider {
 		return getProperty("auth.anonymous");
 	}
 
-	public boolean authorise(V7File resource, AuthenticationToken user,
-			String permission) {
-		Object[] roles;
+	/**
+	 * handles anonymous user
+	 * 
+	 * @return null, if no access should be allowed
+	 */
+	Object[] getRoles(AuthenticationToken user) {
 		if (user == null || user == AuthenticationToken.ANONYMOUS) {
 			String a = getAnonymousUser();
 			if (StringUtils.isBlank(a))
-				return false;
-			roles = new String[] { a };
+				return null;
+			return new String[] { a };
 		} else {
-			roles = user.getRoles();
+			return user.getRoles();
 		}
+	}
+
+	private boolean authorise(V7File resource, AuthenticationToken user,
+			String permission) {
+		Object[] roles = getRoles(user);
+		if (roles == null)
+			return false;
+
 		String[] acl = StringUtils.stripAll(StringUtils.split(
 				getProperty(permission), ','));
 		for (Object role : roles) {
@@ -68,6 +79,18 @@ class GlobalAuthorisationProvider implements AuthorisationProvider {
 				return true;
 		}
 		return false;
+	}
+
+	public boolean authoriseOpen(V7File resource, AuthenticationToken user) {
+		return authoriseRead(resource, user);
+	}
+
+	public boolean authoriseRead(V7File resource, AuthenticationToken user) {
+		return authorise(resource, user, "acl.read");
+	}
+
+	public boolean authoriseWrite(V7File resource, AuthenticationToken user) {
+		return authorise(resource, user, "acl.write");
 	}
 
 }

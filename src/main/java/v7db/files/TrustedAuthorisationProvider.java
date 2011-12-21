@@ -15,14 +15,21 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.auth;
+package v7db.files;
 
-import v7db.files.V7File;
+import v7db.auth.AuthenticationToken;
 
 class TrustedAuthorisationProvider implements AuthorisationProvider {
 
-	public boolean authorise(V7File resource, AuthenticationToken user,
-			String permission) {
+	public boolean authoriseOpen(V7File resource, AuthenticationToken user) {
+		return true;
+	}
+
+	public boolean authoriseRead(V7File resource, AuthenticationToken user) {
+		return true;
+	}
+
+	public boolean authoriseWrite(V7File resource, AuthenticationToken user) {
 		return true;
 	}
 

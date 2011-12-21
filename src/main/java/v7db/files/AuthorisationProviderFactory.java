@@ -15,33 +15,23 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.auth;
+package v7db.files;
 
 import java.util.Properties;
 
 import org.apache.commons.lang3.StringUtils;
 
-public class AuthFactory {
-
-	public static AuthenticationProvider getAuthenticationProvider(
-			Properties props) {
-		String p = props.getProperty("auth.provider");
-		if (StringUtils.isBlank(p))
-			return null;
-		if ("demo".equals(p)) {
-			return new DemoAuthenticationProvider(props);
-		}
-		throw new SecurityException("no such authentication provider " + p);
-	}
+public class AuthorisationProviderFactory {
 
 	public static AuthorisationProvider getAuthorisationProvider(
 			Properties props, String endpoint) {
 		String p = props.getProperty("acl.provider");
 		if (StringUtils.isBlank(p))
 			throw new SecurityException("no authorisation provider defined");
-		if ("global".equals(p)) {
+		if ("acl".equals(p))
+			return new AclAuthorisationProvider(props, endpoint);
+		if ("global".equals(p))
 			return new GlobalAuthorisationProvider(props, endpoint);
-		}
 		if ("trusted".equals(p))
 			return new TrustedAuthorisationProvider();
 

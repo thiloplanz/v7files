@@ -23,6 +23,8 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.lang3.ArrayUtils;
+import org.bson.BSONObject;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
@@ -37,13 +39,16 @@ public class V7File {
 
 	private final DBObject metaData;
 
-	V7File(V7GridFS gridFS, DBObject metaData) {
+	private final V7File parent;
+
+	V7File(V7GridFS gridFS, DBObject metaData, V7File parent) {
 		this.gridFS = gridFS;
 		this.metaData = metaData;
+		this.parent = parent;
 	}
 
 	static V7File lazy(V7GridFS gridFS, Object id) {
-		return new V7File(gridFS, new BasicDBObject("_id", id));
+		return new V7File(gridFS, new BasicDBObject("_id", id), null);
 	}
 
 	private void loadGridFile() {
@@ -63,7 +68,13 @@ public class V7File {
 	}
 
 	public Object getParentId() {
+		if (parent != null)
+			return parent.getId();
 		return metaData.get("parent");
+	}
+
+	public V7File getParent() {
+		return parent;
 	}
 
 	public String getName() {
@@ -105,11 +116,11 @@ public class V7File {
 	}
 
 	public List<V7File> getChildren() {
-		return gridFS.getChildren(getId());
+		return gridFS.getChildren(this);
 	}
 
 	public V7File getChild(String childName) {
-		return gridFS.getChild(getId(), childName);
+		return gridFS.getChild(this, childName);
 	}
 
 	public V7File createChild(byte[] data, String filename, String contentType)
@@ -143,6 +154,35 @@ public class V7File {
 
 	public void delete() {
 		gridFS.delete(metaData);
+	}
+
+	/**
+	 * @param permission
+	 *            "read", "write", or "open"
+	 * @return the ACL for this permission, if not set, inherited from parents
+	 *         null if not set (not even at parents), empty if set but empty
+	 */
+	public Object[] getEffectiveAcl(String permission) {
+		BSONObject acls = (BSONObject) metaData.get("acl");
+		if (acls == null)
+			if (parent != null)
+				return parent.getEffectiveAcl(permission);
+			else
+				return null;
+		List<?> acl = (List<?>) acls.get(permission);
+		if (acl == null)
+			return ArrayUtils.EMPTY_OBJECT_ARRAY;
+		return acl.toArray();
+	}
+
+	Object[] getAcl(String permission) {
+		BSONObject acls = (BSONObject) metaData.get("acl");
+		if (acls == null)
+			return null;
+		List<?> acl = (List<?>) acls.get(permission);
+		if (acl == null)
+			return ArrayUtils.EMPTY_OBJECT_ARRAY;
+		return acl.toArray();
 	}
 
 }
