@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
@@ -115,22 +116,14 @@ public class V7GridFS {
 	public Object addFile(byte[] data, Object parentFileId, String filename,
 			String contentType) throws IOException {
 		BasicDBObject metaData = new BasicDBObject("filename", filename)
-				.append("parent", parentFileId);
+				.append("parent", parentFileId).append("_id", new ObjectId());
 
 		if (StringUtils.isNotBlank(contentType))
 			metaData.append("contentType", contentType);
 
 		if (data != null) {
-			byte[] sha = DigestUtils.sha(data);
-
-			if (!contentAlreadyExists(sha)) {
-				GridFSInputFile file = fs.createFile(data);
-				file.setFilename(filename);
-				file.put("_id", sha);
-				file.save();
-			}
+			byte[] sha = insertContents(data, filename, metaData.get("_id"));
 			metaData.append("sha", sha).append("length", data.length);
-
 		}
 
 		insertMetaData(metaData);
@@ -144,6 +137,23 @@ public class V7GridFS {
 			children.add(new V7File(this, child));
 		}
 		return children;
+	}
+
+	private byte[] insertContents(byte[] data, String filename, Object fileId) {
+		byte[] sha = DigestUtils.sha(data);
+
+		if (!contentAlreadyExists(sha)) {
+			GridFSInputFile file = fs.createFile(data);
+			file.setFilename(filename);
+			file.put("_id", sha);
+			file.put("refs", new Object[] { fileId });
+			file.put("refHistory", file.get("refs"));
+			file.save();
+		} else {
+			addRefs(sha, fileId);
+
+		}
+		return sha;
 	}
 
 	private void insertMetaData(DBObject metaData) throws IOException {
@@ -172,18 +182,41 @@ public class V7GridFS {
 			throw new IOException(error);
 	}
 
-	void updateContents(DBObject metaData, byte[] contents) throws IOException {
-		byte[] sha = DigestUtils.sha(contents);
+	private DBCollection getGridFSMetaCollection() {
+		return files.getDB().getCollectionFromString("v7.fs.files");
+	}
 
-		if (!contentAlreadyExists(sha)) {
-			GridFSInputFile file = fs.createFile(contents);
-			file.setFilename((String) metaData.get("filename"));
-			file.put("_id", sha);
-			file.save();
-		}
+	// add a backreference to the GridFS file (for garbage collection)
+	private void addRefs(byte[] sha, Object fileId) {
+		getGridFSMetaCollection().update(
+				new BasicDBObject("_id", sha),
+				new BasicDBObject("$addToSet",
+						new BasicDBObject("refs", fileId).append("refHistory",
+								fileId)));
+	}
+
+	// remove the current backreference (but keep the refHistory)
+	private void removeRef(byte[] sha, Object fileId) {
+		if (sha == null)
+			return;
+		getGridFSMetaCollection().update(new BasicDBObject("_id", sha),
+				new BasicDBObject("$pull", new BasicDBObject("refs", fileId)));
+	}
+
+	void updateContents(DBObject metaData, byte[] contents) throws IOException {
+
+		byte[] oldSha = (byte[]) metaData.get("sha");
+
+		byte[] sha = insertContents(contents,
+				(String) metaData.get("filename"), metaData.get("_id"));
+
+		if (oldSha != null && Arrays.equals(sha, oldSha))
+			return;
+
 		metaData.put("sha", sha);
 		metaData.put("length", contents.length);
 		updateMetaData(metaData);
+		removeRef(oldSha, metaData.get("_id"));
 	}
 
 	public V7File getChild(Object parentFileId, String childName) {
