@@ -233,10 +233,9 @@ public class V7GridFS {
 		return new V7File(this, child, parentFile);
 	}
 
-	void delete(DBObject metaData) {
-		byte[] oldSha = (byte[]) metaData.get("sha");
-		WriteResult r = files.remove(thisVersion(metaData));
-		if (r.getN() > 0)
-			removeRef(oldSha, metaData.get("_id"));
+	void delete(V7File file) throws IOException {
+		byte[] oldSha = file.getSha();
+		file.removeThisVersion(files);
+		removeRef(oldSha, file.getId());
 	}
 }

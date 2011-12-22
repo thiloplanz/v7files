@@ -55,6 +55,8 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private AuthorisationProvider authorisation;
 
+	private boolean fakeLocking = false;
+
 	public void init(ApplicationConfig config, HttpManager manager) {
 		try {
 			endpoint = config.getInitParameter("v7files.endpoint");
@@ -75,6 +77,9 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			authorisation = AuthorisationProviderFactory
 					.getAuthorisationProvider(Configuration.getProperties(),
 							endpoint);
+
+			fakeLocking = "fake".equals(getProperty("locking.provider"));
+
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -87,7 +92,9 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 				.getServletContext().getContextPath());
 
 		if ("/".equals(path)) {
-			return new FolderResource(endpointName, fs.getFile(ROOT), this);
+			return fakeLocking ? new LockableFolderResource(endpointName, fs
+					.getFile(ROOT), this) : new FolderResource(endpointName, fs
+					.getFile(ROOT), this);
 		}
 
 		String[] p = path.split("/");
@@ -98,9 +105,11 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			return null;
 
 		if (f.hasContent())
-			return new FileResource(f, this);
+			return fakeLocking ? new LockableFileResource(f, this)
+					: new FileResource(f, this);
 
-		return new FolderResource(f, this);
+		return fakeLocking ? new LockableFolderResource(f, this)
+				: new FolderResource(f, this);
 	}
 
 	public void destroy(HttpManager manager) {
@@ -129,7 +138,12 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		case MKCOL:
 		case MOVE:
 		case DELETE:
+		case LOCK:
 			return authorisation.authoriseWrite(file, tag);
+		case UNLOCK:
+			// unlock only works if you have the lock token, so no extra
+			// authorisation required
+			return true;
 		default:
 			System.err.println("acl not implemented for " + method);
 			return false;

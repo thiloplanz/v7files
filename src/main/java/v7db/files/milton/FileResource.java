@@ -140,7 +140,12 @@ class FileResource implements GetableResource, PropFindableResource,
 
 	public void delete() throws NotAuthorizedException, ConflictException,
 			BadRequestException {
-		file.delete();
+		try {
+			file.delete();
+		} catch (IOException e) {
+			System.err.println();
+			throw new ConflictException(this);
+		}
 	}
 
 }

@@ -19,6 +19,7 @@ package v7db.files;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
 
@@ -27,7 +28,9 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
 
 import com.mongodb.BasicDBObject;
+import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
+import com.mongodb.WriteResult;
 import com.mongodb.gridfs.GridFSDBFile;
 
 public class V7File {
@@ -73,6 +76,37 @@ public class V7File {
 		return metaData.get("parent");
 	}
 
+	public int getVersion() {
+		return ((Number) metaData.get("_version")).intValue();
+	}
+
+	WriteResult updateThisVersion(DBCollection collection, DBObject update)
+			throws IOException {
+		DBObject find = new BasicDBObject("_id", metaData.get("_id")).append(
+				"_version", metaData.get("_version"));
+		WriteResult r = collection.update(find, update);
+		if (r.getError() != null)
+			throw new IOException(r.getError());
+		if (r.getN() == 0)
+			throw new ConcurrentModificationException("version " + getVersion()
+					+ " is no longer the current version for file " + getId()
+					+ " (" + getName() + ")");
+		return r;
+	}
+
+	WriteResult removeThisVersion(DBCollection collection) throws IOException {
+		DBObject find = new BasicDBObject("_id", metaData.get("_id")).append(
+				"_version", metaData.get("_version"));
+		WriteResult r = collection.remove(find);
+		if (r.getError() != null)
+			throw new IOException(r.getError());
+		if (r.getN() == 0)
+			throw new ConcurrentModificationException("version " + getVersion()
+					+ " is no longer the current version for file " + getId()
+					+ " (" + getName() + ")");
+		return r;
+	}
+
 	public V7File getParent() {
 		return parent;
 	}
@@ -91,7 +125,7 @@ public class V7File {
 		return gridFile.getInputStream();
 	}
 
-	private byte[] getSha() {
+	byte[] getSha() {
 		return (byte[]) metaData.get("sha");
 	}
 
@@ -152,8 +186,8 @@ public class V7File {
 		return (Date) metaData.get("created_at");
 	}
 
-	public void delete() {
-		gridFS.delete(metaData);
+	public void delete() throws IOException {
+		gridFS.delete(this);
 	}
 
 	/**
