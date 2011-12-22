@@ -22,10 +22,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.grizzly.http.server.NetworkListener;
-import org.glassfish.grizzly.http.server.ServerConfiguration;
-import org.glassfish.grizzly.servlet.ServletHandler;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 
 import v7db.files.milton.MiltonServlet;
 
@@ -35,7 +34,7 @@ public class Main {
 	 * @param args
 	 * @throws IOException
 	 */
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws Exception {
 
 		if (args.length == 2 && "-f".equals(args[0])) {
 			File configFile = new File(args[1]);
@@ -49,28 +48,21 @@ public class Main {
 			System.exit(1);
 		}
 
-		ServletHandler handler = new ServletHandler();
-		handler.setServletInstance(new MiltonServlet());
+		ServletContextHandler handler = new ServletContextHandler();
+		handler.setContextPath("/");
 
 		String endpoint = Configuration.getProperty("v7files.endpoints");
-		if ("/".equals(endpoint)) {
-			handler.setContextPath("");
-		} else {
-			handler.setContextPath(endpoint);
-		}
-		handler.addInitParameter("v7files.endpoint", endpoint);
-		handler.addInitParameter("resource.factory.factory.class",
+
+		ServletHolder servlet = new ServletHolder(new MiltonServlet());
+		servlet.setInitParameter("v7files.endpoint", endpoint);
+		servlet.setInitParameter("resource.factory.factory.class",
 				Configuration.getProperty("resource.factory.factory.class"));
 
-		final HttpServer server = new HttpServer();
-		int port = Integer.parseInt(Configuration.getProperty("http.port"));
-		String host = NetworkListener.DEFAULT_NETWORK_HOST;
-		final NetworkListener listener = new NetworkListener("grizzly", host,
-				port);
-		server.addListener(listener);
+		handler.addServlet(servlet, endpoint + "/*");
 
-		final ServerConfiguration config = server.getServerConfiguration();
-		config.addHttpHandler(handler, "/");
+		int port = Integer.parseInt(Configuration.getProperty("http.port"));
+		final Server server = new Server(port);
+		server.setHandler(handler);
 
 		server.start();
 
