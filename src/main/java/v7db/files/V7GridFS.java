@@ -17,13 +17,21 @@
 
 package v7db.files;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
 import org.bson.types.ObjectId;
@@ -116,6 +124,15 @@ public class V7GridFS {
 	 */
 	public Object addFile(byte[] data, Object parentFileId, String filename,
 			String contentType) throws IOException {
+		if (data == null)
+			return addFile(null, 0, 0, parentFileId, filename, contentType);
+		return addFile(data, 0, data.length, parentFileId, filename,
+				contentType);
+	}
+
+	public Object addFile(byte[] data, int offset, int len,
+			Object parentFileId, String filename, String contentType)
+			throws IOException {
 		BasicDBObject metaData = new BasicDBObject("filename", filename)
 				.append("parent", parentFileId).append("_id", new ObjectId());
 
@@ -123,8 +140,27 @@ public class V7GridFS {
 			metaData.append("contentType", contentType);
 
 		if (data != null) {
-			byte[] sha = insertContents(data, filename, metaData.get("_id"));
-			metaData.append("sha", sha).append("length", data.length);
+			byte[] sha = insertContents(data, offset, len, filename, metaData
+					.get("_id"), contentType);
+			metaData.append("sha", sha).append("length", len);
+		}
+
+		insertMetaData(metaData);
+		return metaData.get("_id");
+	}
+
+	public Object addFile(File data, Object parentFileId, String filename,
+			String contentType) throws IOException {
+		BasicDBObject metaData = new BasicDBObject("filename", filename)
+				.append("parent", parentFileId).append("_id", new ObjectId());
+
+		if (StringUtils.isNotBlank(contentType))
+			metaData.append("contentType", contentType);
+
+		if (data != null) {
+			byte[] sha = insertContents(data, filename, metaData.get("_id"),
+					contentType);
+			metaData.append("sha", sha).append("length", data.length());
 		}
 
 		insertMetaData(metaData);
@@ -140,12 +176,36 @@ public class V7GridFS {
 		return children;
 	}
 
-	private byte[] insertContents(byte[] data, String filename, Object fileId) {
+	private byte[] insertContents(byte[] data, int offset, int len,
+			String filename, Object fileId, String contentType) {
 		byte[] sha = DigestUtils.sha(data);
+
+		if (!contentAlreadyExists(sha)) {
+			GridFSInputFile file = fs.createFile(new ByteArrayInputStream(data,
+					offset, len), true);
+			file.setFilename(filename);
+			file.setContentType(contentType);
+			file.put("_id", sha);
+			file.put("refs", new Object[] { fileId });
+			file.put("refHistory", file.get("refs"));
+			file.save();
+		} else {
+			addRefs(sha, fileId);
+
+		}
+		return sha;
+	}
+
+	private byte[] insertContents(File data, String filename, Object fileId,
+			String contentType) throws IOException {
+		FileInputStream fis = new FileInputStream(data);
+		byte[] sha = DigestUtils.sha(fis);
+		fis.close();
 
 		if (!contentAlreadyExists(sha)) {
 			GridFSInputFile file = fs.createFile(data);
 			file.setFilename(filename);
+			file.setContentType(contentType);
 			file.put("_id", sha);
 			file.put("refs", new Object[] { fileId });
 			file.put("refHistory", file.get("refs"));
@@ -210,11 +270,89 @@ public class V7GridFS {
 	}
 
 	void updateContents(DBObject metaData, byte[] contents) throws IOException {
+		updateContents(metaData, contents, 0, contents == null ? 0
+				: contents.length);
+	}
+
+	/**
+	 * read into the buffer, continuing until the stream is finished or the
+	 * buffer is full.
+	 * 
+	 * @return the number of bytes read, which could be 0 (not -1)
+	 * @throws IOException
+	 */
+	static int readFully(InputStream data, byte[] buffer) throws IOException {
+		int read = data.read(buffer);
+		if (read == -1) {
+			return 0;
+		}
+		while (read < buffer.length) {
+			int added = data.read(buffer, read, buffer.length - read);
+			if (added == -1)
+				return read;
+			read += added;
+		}
+		return read;
+	}
+
+	void updateContents(DBObject metaData, InputStream contents)
+			throws IOException {
+		if (contents == null) {
+			updateContents(metaData, (byte[]) null);
+			return;
+		}
+		// read the first megabyte into a buffer
+		byte[] buffer = new byte[1024 * 1024];
+		int read = readFully(contents, buffer);
+		if (read == 0) {
+			updateContents(metaData, ArrayUtils.EMPTY_BYTE_ARRAY);
+			return;
+		}
+
+		// did it fit completely in the buffer?
+		if (read < buffer.length) {
+			updateContents(metaData, buffer, 0, read);
+			return;
+		}
+		// if not, copy to a temporary file
+		// so that we can calculate the SHA-1 first
+		File temp = File.createTempFile("v7files-upload-", ".tmp");
+		try {
+			OutputStream out = new FileOutputStream(temp);
+			out.write(buffer);
+			IOUtils.copy(contents, out);
+			out.close();
+			updateContents(metaData, temp);
+		} finally {
+			temp.delete();
+		}
+	}
+
+	void updateContents(DBObject metaData, File contents) throws IOException {
 
 		byte[] oldSha = (byte[]) metaData.get("sha");
 
 		byte[] sha = insertContents(contents,
-				(String) metaData.get("filename"), metaData.get("_id"));
+				(String) metaData.get("filename"), metaData.get("_id"),
+				(String) metaData.get("contentType"));
+
+		if (oldSha != null && Arrays.equals(sha, oldSha))
+			return;
+
+		metaData.put("sha", sha);
+		metaData.put("length", contents.length());
+		updateMetaData(metaData);
+		removeRef(oldSha, metaData.get("_id"));
+	}
+
+	void updateContents(DBObject metaData, byte[] contents, int offset, int len)
+			throws IOException {
+
+		byte[] oldSha = (byte[]) metaData.get("sha");
+
+		byte[] sha = insertContents(contents, offset, len, (String) metaData
+				.get("filename"), metaData.get("_id"), (String) metaData
+				.get("contentType"));
 
 		if (oldSha != null && Arrays.equals(sha, oldSha))
 			return;

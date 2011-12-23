@@ -17,13 +17,17 @@
 
 package v7db.files;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
 
@@ -163,6 +167,46 @@ public class V7File {
 		return lazy(gridFS, childId);
 	}
 
+	public V7File createChild(byte[] data, int offset, int len,
+			String filename, String contentType) throws IOException {
+		Object childId = gridFS.addFile(data, offset, len, getId(), filename,
+				contentType);
+		return lazy(gridFS, childId);
+	};
+
+	public V7File createChild(File data, String filename, String contentType)
+			throws IOException {
+		Object childId = gridFS.addFile(data, getId(), filename, contentType);
+		return lazy(gridFS, childId);
+	}
+
+	public V7File createChild(InputStream data, String filename,
+			String contentType) throws IOException {
+		if (data == null)
+			return createChild(null, 0, 0, filename, contentType);
+		// read the first megabyte into a buffer
+		byte[] buffer = new byte[1024 * 1024];
+		int read = V7GridFS.readFully(data, buffer);
+		if (read == 0)
+			return createChild(ArrayUtils.EMPTY_BYTE_ARRAY, filename,
+					contentType);
+		// did it fit completely in the buffer?
+		if (read < buffer.length)
+			return createChild(buffer, 0, read, filename, contentType);
+		// if not, copy to a temporary file
+		// so that we can calculate the SHA-1 first
+		File temp = File.createTempFile("v7files-upload-", ".tmp");
+		try {
+			OutputStream out = new FileOutputStream(temp);
+			out.write(buffer);
+			IOUtils.copy(data, out);
+			out.close();
+			return createChild(temp, filename, contentType);
+		} finally {
+			temp.delete();
+		}
+	}
+
 	public void rename(String newName) throws IOException {
 		metaData.put("filename", newName);
 		gridFS.updateMetaData(metaData);
@@ -174,6 +218,12 @@ public class V7File {
 	}
 
 	public void setContent(byte[] data, String contentType) throws IOException {
+		metaData.put("contentType", contentType);
+		gridFS.updateContents(metaData, data);
+	}
+
+	public void setContent(InputStream data, String contentType)
+			throws IOException {
 		metaData.put("contentType", contentType);
 		gridFS.updateContents(metaData, data);
 	}

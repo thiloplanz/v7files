@@ -22,8 +22,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
-
 import v7db.files.V7File;
 
 import com.bradmcevoy.http.CollectionResource;
@@ -64,8 +62,7 @@ public class FolderResource extends FileResource implements CollectionResource,
 		Resource existingChild = child(newName);
 		if (existingChild == null) {
 
-			V7File child = file.createChild(IOUtils.toByteArray(inputStream),
-					newName, contentType);
+			V7File child = file.createChild(inputStream, newName, contentType);
 
 			return new FileResource(child, factory);
 		}
@@ -74,8 +71,8 @@ public class FolderResource extends FileResource implements CollectionResource,
 					"already exists and is a folder");
 		}
 
-		((FileResource) existingChild).file.setContent(IOUtils
-				.toByteArray(inputStream), contentType);
+		((FileResource) existingChild).file
+				.setContent(inputStream, contentType);
 		return existingChild;
 	}
 
@@ -84,7 +81,7 @@ public class FolderResource extends FileResource implements CollectionResource,
 			BadRequestException {
 		V7File child;
 		try {
-			child = file.createChild(null, newName, null);
+			child = file.createChild((byte[]) null, newName, null);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
