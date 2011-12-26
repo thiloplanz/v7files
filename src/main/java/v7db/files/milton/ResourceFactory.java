@@ -20,6 +20,9 @@ package v7db.files.milton;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.substringAfter;
 import static org.apache.commons.lang3.StringUtils.substringAfterLast;
+
+import org.slf4j.MDC;
+
 import v7db.auth.AuthenticationProvider;
 import v7db.auth.AuthenticationProviderFactory;
 import v7db.auth.AuthenticationToken;
@@ -51,6 +54,8 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private String endpointName;
 
+	private String dbName;
+
 	private AuthenticationProvider authentication;
 
 	private AuthorisationProvider authorisation;
@@ -65,7 +70,8 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 					"/");
 
 			mongo = Configuration.getMongo(endpoint);
-			fs = new V7GridFS(mongo.getDB(getProperty("mongo.db")));
+			dbName = getProperty("mongo.db");
+			fs = new V7GridFS(mongo.getDB(dbName));
 
 			ROOT = getProperty("root");
 			if (ROOT == null)
@@ -126,6 +132,8 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 	}
 
 	boolean authorise(V7File file, Request request, Method method, Auth auth) {
+
+		MDC.put("tenant", dbName);
 		AuthenticationToken tag = auth == null ? null
 				: (AuthenticationToken) auth.getTag();
 		switch (method) {
@@ -160,7 +168,12 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		if (authentication == null)
 			return null;
 
-		return authentication.authenticate(user, password);
+		AuthenticationToken auth = authentication.authenticate(user, password);
+
+		if (auth != null)
+			MDC.put("user", auth.getUsername());
+
+		return auth;
 
 	}
 

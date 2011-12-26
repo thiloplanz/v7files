@@ -17,8 +17,18 @@
 
 package v7db.files.milton;
 
+import java.io.IOException;
+
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import com.bradmcevoy.http.AuthenticationService;
 import com.bradmcevoy.http.Handler;
@@ -27,6 +37,27 @@ import com.bradmcevoy.http.http11.Http11Protocol;
 import com.bradmcevoy.http.webdav.DefaultWebDavResponseHandler;
 
 public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
+
+	private static Logger log = LoggerFactory.getLogger(MiltonServlet.class);
+
+	@Override
+	public void service(ServletRequest servletRequest,
+			ServletResponse servletResponse) throws ServletException,
+			IOException {
+		long time = System.nanoTime();
+		HttpServletRequest r = (HttpServletRequest) servletRequest;
+		HttpServletResponse s = (HttpServletResponse) servletResponse;
+		try {
+			MDC.put("path", r.getRequestURI());
+			MDC.put("method", r.getMethod());
+			super.service(servletRequest, servletResponse);
+		} finally {
+			long taken = System.nanoTime() - time;
+			log.info("request took " + taken / (1000 * 1000) + " ms, status "
+					+ s.getStatus());
+			MDC.clear();
+		}
+	}
 
 	@Override
 	public void init(ServletConfig config) throws ServletException {
