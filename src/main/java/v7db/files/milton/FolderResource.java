@@ -62,7 +62,9 @@ public class FolderResource extends FileResource implements CollectionResource,
 		Resource existingChild = child(newName);
 		if (existingChild == null) {
 
-			V7File child = file.createChild(inputStream, newName, contentType);
+			V7File child = length != null ? file.createChild(inputStream,
+					length, newName, contentType) : file.createChild(
+					inputStream, newName, contentType);
 
 			return new FileResource(child, factory);
 		}
@@ -71,8 +73,12 @@ public class FolderResource extends FileResource implements CollectionResource,
 					"already exists and is a folder");
 		}
 
-		((FileResource) existingChild).file
-				.setContent(inputStream, contentType);
+		if (length != null)
+			((FileResource) existingChild).file.setContent(inputStream, length,
+					contentType);
+		else
+			((FileResource) existingChild).file.setContent(inputStream,
+					contentType);
 		return existingChild;
 	}
 

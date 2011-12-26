@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -295,12 +296,31 @@ public class V7GridFS {
 		return read;
 	}
 
-	void updateContents(DBObject metaData, InputStream contents)
+	void updateContents(DBObject metaData, InputStream contents, Long size)
 			throws IOException {
 		if (contents == null) {
 			updateContents(metaData, (byte[]) null);
 			return;
 		}
+		if (size != null) {
+			if (size <= 1024 * 1024) {
+				updateContents(metaData, IOUtils.toByteArray(contents, size));
+				return;
+			}
+			File temp = File.createTempFile("v7files-upload-", ".tmp");
+			try {
+				FileUtils.copyInputStreamToFile(contents, temp);
+				if (temp.length() != size)
+					throw new IOException("read incorrect number of bytes for "
+							+ metaData.get("filename") + ", expected " + size
+							+ " but got " + temp.length());
+				updateContents(metaData, temp);
+			} finally {
+				temp.delete();
+			}
+			return;
+		}
+
 		// read the first megabyte into a buffer
 		byte[] buffer = new byte[1024 * 1024];
 		int read = readFully(contents, buffer);
@@ -320,6 +340,7 @@ public class V7GridFS {
 		try {
 			OutputStream out = new FileOutputStream(temp);
 			out.write(buffer);
+			buffer = null;
 			IOUtils.copy(contents, out);
 			out.close();
 			updateContents(metaData, temp);

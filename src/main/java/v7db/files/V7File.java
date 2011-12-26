@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
@@ -180,6 +181,27 @@ public class V7File {
 		return lazy(gridFS, childId);
 	}
 
+	public V7File createChild(InputStream data, long size, String filename,
+			String contentType) throws IOException {
+		if (size <= 1024 * 1024)
+			return createChild(IOUtils.toByteArray(data, size), filename,
+					contentType);
+
+		File temp = File.createTempFile("v7files-upload-", ".tmp");
+		try {
+			FileUtils.copyInputStreamToFile(data, temp);
+			if (temp.length() != size) {
+				throw new IOException("read incorrect number of bytes for "
+						+ filename + ", expected " + size + " but got "
+						+ temp.length());
+			}
+			return createChild(temp, filename, contentType);
+
+		} finally {
+			temp.delete();
+		}
+	}
+
 	public V7File createChild(InputStream data, String filename,
 			String contentType) throws IOException {
 		if (data == null)
@@ -199,6 +221,7 @@ public class V7File {
 		try {
 			OutputStream out = new FileOutputStream(temp);
 			out.write(buffer);
+			buffer = null;
 			IOUtils.copy(data, out);
 			out.close();
 			return createChild(temp, filename, contentType);
@@ -225,7 +248,13 @@ public class V7File {
 	public void setContent(InputStream data, String contentType)
 			throws IOException {
 		metaData.put("contentType", contentType);
-		gridFS.updateContents(metaData, data);
+		gridFS.updateContents(metaData, data, null);
+	}
+
+	public void setContent(InputStream data, long size, String contentType)
+			throws IOException {
+		metaData.put("contentType", contentType);
+		gridFS.updateContents(metaData, data, size);
 	}
 
 	public Date getModifiedDate() {
