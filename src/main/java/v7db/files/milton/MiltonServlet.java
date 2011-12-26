@@ -30,6 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
+import v7db.files.Configuration;
+
 import com.bradmcevoy.http.AuthenticationService;
 import com.bradmcevoy.http.Handler;
 import com.bradmcevoy.http.HttpExtension;
@@ -40,6 +42,8 @@ public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 
 	private static Logger log = LoggerFactory.getLogger(MiltonServlet.class);
 
+	private String dbName;
+
 	@Override
 	public void service(ServletRequest servletRequest,
 			ServletResponse servletResponse) throws ServletException,
@@ -48,6 +52,7 @@ public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 		HttpServletRequest r = (HttpServletRequest) servletRequest;
 		HttpServletResponse s = (HttpServletResponse) servletResponse;
 		try {
+			MDC.put("tenant", dbName);
 			MDC.put("path", r.getRequestURI());
 			MDC.put("method", r.getMethod());
 			super.service(servletRequest, servletResponse);
@@ -61,6 +66,8 @@ public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 
 	@Override
 	public void init(ServletConfig config) throws ServletException {
+		String endpoint = config.getInitParameter("v7files.endpoint");
+		dbName = Configuration.getEndpointProperty(endpoint, "mongo.db");
 		super.init(config);
 		// http://stackoverflow.com/questions/8380324/
 		httpManager.getHandlers().setEnableExpectContinue(false);

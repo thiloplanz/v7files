@@ -133,7 +133,6 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	boolean authorise(V7File file, Request request, Method method, Auth auth) {
 
-		MDC.put("tenant", dbName);
 		AuthenticationToken tag = auth == null ? null
 				: (AuthenticationToken) auth.getTag();
 		switch (method) {

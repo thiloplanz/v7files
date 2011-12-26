@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Properties;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.PropertyConfigurator;
 
 import com.mongodb.Mongo;
@@ -46,6 +47,13 @@ public class Configuration {
 
 	public static String getProperty(String key) {
 		return props.getProperty(key);
+	}
+
+	/**
+	 * property string value is split by comma and trimmed for space
+	 */
+	public static String[] getArrayProperty(String key) {
+		return StringUtils.stripAll(StringUtils.split(getProperty(key), ','));
 	}
 
 	public static String getEndpointProperty(String endpoint, String key) {

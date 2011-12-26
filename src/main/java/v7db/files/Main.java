@@ -51,15 +51,21 @@ public class Main {
 		ServletContextHandler handler = new ServletContextHandler();
 		handler.setContextPath("/");
 
-		String endpoint = Configuration.getProperty("v7files.endpoints");
+		String[] endpoints = Configuration
+				.getArrayProperty("v7files.endpoints");
 
-		ServletHolder servlet = new ServletHolder(new MiltonServlet());
-		servlet.setInitParameter("v7files.endpoint", endpoint);
-		servlet.setInitParameter("resource.factory.factory.class",
-				Configuration.getProperty("resource.factory.factory.class"));
+		for (String endpoint : endpoints) {
 
-		handler.addServlet(servlet, endpoint + "/*");
+			ServletHolder servlet = new ServletHolder(new MiltonServlet());
+			servlet.setInitParameter("v7files.endpoint", endpoint);
+			servlet
+					.setInitParameter(
+							"resource.factory.factory.class",
+							Configuration
+									.getProperty("resource.factory.factory.class"));
 
+			handler.addServlet(servlet, endpoint + "/*");
+		}
 		int port = Integer.parseInt(Configuration.getProperty("http.port"));
 		final Server server = new Server(port);
 		server.setHandler(handler);
