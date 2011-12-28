@@ -63,8 +63,8 @@ public class Configuration {
 		return p;
 	}
 
-	public static final Mongo getMongo(String endpoint)
-			throws UnknownHostException, MongoException {
+	public static final Mongo getMongo() throws UnknownHostException,
+			MongoException {
 		Mongo mongo = new Mongo();
 		return mongo;
 	}

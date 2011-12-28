@@ -29,8 +29,8 @@ import v7db.auth.AuthenticationToken;
 import v7db.files.AuthorisationProvider;
 import v7db.files.AuthorisationProviderFactory;
 import v7db.files.Configuration;
+import v7db.files.TenantManager;
 import v7db.files.V7File;
-import v7db.files.V7GridFS;
 
 import com.bradmcevoy.http.ApplicationConfig;
 import com.bradmcevoy.http.Auth;
@@ -46,15 +46,13 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private Mongo mongo;
 
-	private V7GridFS fs;
-
 	private String ROOT;
 
 	private String endpoint;
 
 	private String endpointName;
 
-	private String dbName;
+	private TenantManager tenants;
 
 	private AuthenticationProvider authentication;
 
@@ -69,9 +67,9 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			endpointName = defaultIfBlank(substringAfterLast(endpoint, "/"),
 					"/");
 
-			mongo = Configuration.getMongo(endpoint);
-			dbName = getProperty("mongo.db");
-			fs = new V7GridFS(mongo.getDB(dbName));
+			mongo = Configuration.getMongo();
+
+			tenants = new TenantManager(mongo, Configuration.getProperties());
 
 			ROOT = getProperty("root");
 			if (ROOT == null)
@@ -97,15 +95,15 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		path = substringAfter(path, MiltonServlet.request().getServletPath());
 
 		if ("/".equals(path)) {
-			return fakeLocking ? new LockableFolderResource(endpointName, fs
-					.getFile(ROOT), this) : new FolderResource(endpointName, fs
-					.getFile(ROOT), this);
+			return fakeLocking ? new LockableFolderResource(endpointName,
+					tenants.getFile(ROOT), this) : new FolderResource(
+					endpointName, tenants.getFile(ROOT), this);
 		}
 
 		String[] p = path.split("/");
 		p[0] = ROOT;
 
-		V7File f = fs.getFile(p);
+		V7File f = tenants.getFile(p);
 		if (f == null)
 			return null;
 

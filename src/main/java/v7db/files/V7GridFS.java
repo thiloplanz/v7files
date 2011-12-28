@@ -41,6 +41,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
+import com.mongodb.Mongo;
 import com.mongodb.WriteResult;
 import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
@@ -48,7 +49,7 @@ import com.mongodb.gridfs.GridFSInputFile;
 
 public class V7GridFS {
 
-	private final String bucket = "v7files";
+	private static final String bucket = "v7files";
 
 	private final DBCollection files;
 
@@ -57,6 +58,11 @@ public class V7GridFS {
 	public V7GridFS(DB db) {
 		files = db.getCollection(bucket);
 		fs = new GridFS(db, "v7.fs");
+	}
+
+	static V7GridFS getIfExists(Mongo mongo, String dbName) {
+		return mongo.getDB(dbName).collectionExists(bucket) ? new V7GridFS(
+				mongo.getDB(dbName)) : null;
 	}
 
 	public V7File getFile(String... path) {
