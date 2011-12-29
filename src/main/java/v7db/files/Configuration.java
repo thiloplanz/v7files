@@ -41,7 +41,7 @@ public class Configuration {
 		PropertyConfigurator.configure(props);
 	}
 
-	public static Properties getProperties() {
+	static Properties getProperties() {
 		return props;
 	}
 
@@ -56,11 +56,8 @@ public class Configuration {
 		return StringUtils.stripAll(StringUtils.split(getProperty(key), ','));
 	}
 
-	public static String getEndpointProperty(String endpoint, String key) {
-		String p = getProperty(endpoint + "." + key);
-		if (p == null)
-			return getProperty(key);
-		return p;
+	public static Properties getEndpointProperties(String endpoint) {
+		return new EndpointProperties(endpoint, props);
 	}
 
 	public static final Mongo getMongo() throws UnknownHostException,

@@ -28,22 +28,12 @@ class GlobalAuthorisationProvider implements AuthorisationProvider {
 
 	private final Properties props;
 
-	private final String endpoint;
-
-	GlobalAuthorisationProvider(Properties props, String endpoint) {
+	GlobalAuthorisationProvider(Properties props) {
 		this.props = props;
-		this.endpoint = endpoint;
-	}
-
-	private String getEndpointProperty(String endpoint, String key) {
-		String p = props.getProperty(endpoint + "." + key);
-		if (p == null)
-			return props.getProperty(key);
-		return p;
 	}
 
 	String getProperty(String name) {
-		return getEndpointProperty(endpoint, name);
+		return props.getProperty(name);
 	}
 
 	private String getAnonymousUser() {

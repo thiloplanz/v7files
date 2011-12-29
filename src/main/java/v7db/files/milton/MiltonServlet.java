@@ -67,7 +67,8 @@ public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		String endpoint = config.getInitParameter("v7files.endpoint");
-		dbName = Configuration.getEndpointProperty(endpoint, "mongo.db");
+		dbName = Configuration.getEndpointProperties(endpoint).getProperty(
+				"mongo.db");
 		super.init(config);
 		// http://stackoverflow.com/questions/8380324/
 		httpManager.getHandlers().setEnableExpectContinue(false);

@@ -27,8 +27,8 @@ class AclAuthorisationProvider implements AuthorisationProvider {
 
 	private final GlobalAuthorisationProvider global;
 
-	public AclAuthorisationProvider(Properties props, String endpoint) {
-		global = new GlobalAuthorisationProvider(props, endpoint);
+	public AclAuthorisationProvider(Properties props) {
+		global = new GlobalAuthorisationProvider(props);
 	}
 
 	private Boolean authorise(V7File resource, AuthenticationToken user,

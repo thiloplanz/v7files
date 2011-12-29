@@ -19,23 +19,23 @@ package v7db.files;
 
 import java.util.Properties;
 
-import org.apache.commons.lang3.StringUtils;
+import junit.framework.TestCase;
 
-public class AuthorisationProviderFactory {
+public class ConfigurationTest extends TestCase {
 
-	public static AuthorisationProvider getAuthorisationProvider(
-			Properties props) {
-		String p = props.getProperty("acl.provider");
-		if (StringUtils.isBlank(p))
-			throw new SecurityException("no authorisation provider defined");
-		if ("acl".equals(p))
-			return new AclAuthorisationProvider(props);
-		if ("global".equals(p))
-			return new GlobalAuthorisationProvider(props);
-		if ("trusted".equals(p))
-			return new TrustedAuthorisationProvider();
-
-		throw new SecurityException("no such authorisation provider " + p);
+	@Override
+	protected void setUp() throws Exception {
+		Configuration.getProperties().clear();
 	}
 
+	public void testGetEndpointProperties() {
+		Properties settings = Configuration.getProperties();
+		settings.setProperty("x", "global");
+		settings.setProperty("/endA.x", "endA");
+		settings.setProperty("/endB.x", "endB");
+		Properties endA = Configuration.getEndpointProperties("/endA");
+		assertEquals("endA", endA.getProperty("x"));
+		Properties endX = Configuration.getEndpointProperties("/endX");
+		assertEquals("global", endX.getProperty("x"));
+	}
 }

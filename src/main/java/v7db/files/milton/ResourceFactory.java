@@ -21,6 +21,8 @@ import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.substringAfter;
 import static org.apache.commons.lang3.StringUtils.substringAfterLast;
 
+import java.util.Properties;
+
 import org.slf4j.MDC;
 
 import v7db.auth.AuthenticationProvider;
@@ -52,6 +54,8 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private String endpointName;
 
+	private Properties endpointProperties;
+
 	private TenantManager tenants;
 
 	private AuthenticationProvider authentication;
@@ -69,18 +73,19 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 			mongo = Configuration.getMongo();
 
-			tenants = new TenantManager(mongo, Configuration.getProperties());
+			endpointProperties = Configuration.getEndpointProperties(endpoint);
+
+			tenants = new TenantManager(mongo, endpointProperties);
 
 			ROOT = getProperty("root");
 			if (ROOT == null)
 				ROOT = endpoint;
 
 			authentication = AuthenticationProviderFactory
-					.getAuthenticationProvider(Configuration.getProperties());
+					.getAuthenticationProvider(endpointProperties);
 
 			authorisation = AuthorisationProviderFactory
-					.getAuthorisationProvider(Configuration.getProperties(),
-							endpoint);
+					.getAuthorisationProvider(endpointProperties);
 
 			fakeLocking = "fake".equals(getProperty("locking.provider"));
 
@@ -122,7 +127,7 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 	}
 
 	String getProperty(String name) {
-		return Configuration.getEndpointProperty(endpoint, name);
+		return endpointProperties.getProperty(name);
 	}
 
 	String getRealm() {
