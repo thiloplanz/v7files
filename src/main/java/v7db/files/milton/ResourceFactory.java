@@ -100,9 +100,11 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		path = substringAfter(path, MiltonServlet.request().getServletPath());
 
 		if ("/".equals(path)) {
-			return fakeLocking ? new LockableFolderResource(endpointName,
-					tenants.getFile(ROOT), this) : new FolderResource(
-					endpointName, tenants.getFile(ROOT), this);
+			V7File root = tenants.getFile(ROOT);
+			if (root == null)
+				return null;
+			return fakeLocking ? new LockableFolderResource(endpointName, root,
+					this) : new FolderResource(endpointName, root, this);
 		}
 
 		String[] p = path.split("/");
