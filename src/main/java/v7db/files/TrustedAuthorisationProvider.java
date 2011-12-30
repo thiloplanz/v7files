@@ -17,20 +17,39 @@
 
 package v7db.files;
 
+import java.util.Properties;
+
 import v7db.auth.AuthenticationToken;
 
-class TrustedAuthorisationProvider implements AuthorisationProvider {
+class TrustedAuthorisationProvider extends GlobalAuthorisationProvider {
 
+	TrustedAuthorisationProvider(Properties props) {
+		super(props);
+	}
+
+	/**
+	 * @return true unless the user is anonymous, and anonymous access is not
+	 *         allowed
+	 */
+	private boolean checkAnonymous(AuthenticationToken user) {
+		if (user != null && user.getUsername() != null)
+			return true;
+		return getRoles(user) != null;
+	}
+
+	@Override
 	public boolean authoriseOpen(V7File resource, AuthenticationToken user) {
-		return true;
+		return checkAnonymous(user);
 	}
 
+	@Override
 	public boolean authoriseRead(V7File resource, AuthenticationToken user) {
-		return true;
+		return checkAnonymous(user);
 	}
 
+	@Override
 	public boolean authoriseWrite(V7File resource, AuthenticationToken user) {
-		return true;
+		return checkAnonymous(user);
 	}
 
 }

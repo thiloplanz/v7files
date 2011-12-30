@@ -17,25 +17,10 @@
 
 package v7db.files;
 
-import java.util.Properties;
+public class AclAuthorisationProviderTest extends AuthorisationProviderTest {
 
-import org.apache.commons.lang3.StringUtils;
-
-public class AuthorisationProviderFactory {
-
-	public static AuthorisationProvider getAuthorisationProvider(
-			Properties props) {
-		String p = props.getProperty("acl.provider");
-		if (StringUtils.isBlank(p))
-			throw new SecurityException("no authorisation provider defined");
-		if ("acl".equals(p))
-			return new AclAuthorisationProvider(props);
-		if ("global".equals(p))
-			return new GlobalAuthorisationProvider(props);
-		if ("trusted".equals(p))
-			return new TrustedAuthorisationProvider(props);
-
-		throw new SecurityException("no such authorisation provider " + p);
+	public AclAuthorisationProviderTest() {
+		super("acl");
 	}
 
 }
