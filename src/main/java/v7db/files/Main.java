@@ -64,7 +64,8 @@ public class Main {
 							Configuration
 									.getProperty("resource.factory.factory.class"));
 
-			handler.addServlet(servlet, endpoint + "/*");
+			handler.addServlet(servlet, endpoint.equals("/") ? "/*"
+					: (endpoint + "/*"));
 		}
 		int port = Integer.parseInt(Configuration.getProperty("http.port"));
 		final Server server = new Server(port);
