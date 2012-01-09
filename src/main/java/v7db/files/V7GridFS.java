@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, Thilo Planz. All rights reserved.
+ * Copyright (c) 2011-2012, Thilo Planz. All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
@@ -183,11 +185,31 @@ public class V7GridFS {
 		return children;
 	}
 
+	private void insertDeflatedContents(InputStream deflatedData, byte[] sha,
+			String filename, Object fileId, String contentType) {
+		GridFSInputFile file = fs.createFile(deflatedData, true);
+		file.setFilename(filename + ".z");
+		file.setContentType(contentType);
+		file.put("_id", sha);
+		file.put("refs", new Object[] { fileId });
+		file.put("refHistory", file.get("refs"));
+		file.put("store", "z");
+		file.save();
+	}
+
 	private byte[] insertContents(byte[] data, int offset, int len,
 			String filename, Object fileId, String contentType) {
 		byte[] sha = DigestUtils.sha(data);
 
 		if (!contentAlreadyExists(sha)) {
+			byte[] compressed = new byte[len];
+			int clen = Compression.deflate(data, offset, len, compressed);
+			if (clen > 0) {
+				insertDeflatedContents(new ByteArrayInputStream(compressed, 0,
+						clen), sha, filename, fileId, contentType);
+				return sha;
+			}
+			compressed = null;
 			GridFSInputFile file = fs.createFile(new ByteArrayInputStream(data,
 					offset, len), true);
 			file.setFilename(filename);
@@ -210,6 +232,15 @@ public class V7GridFS {
 		fis.close();
 
 		if (!contentAlreadyExists(sha)) {
+			final File compressed = Compression.deflate(data);
+			if (compressed != null) {
+				try {
+					insertDeflatedContents(new FileInputStream(compressed),
+							sha, filename, fileId, contentType);
+				} finally {
+					compressed.delete();
+				}
+			}
 			GridFSInputFile file = fs.createFile(data);
 			file.setFilename(filename);
 			file.setContentType(contentType);
@@ -402,5 +433,22 @@ public class V7GridFS {
 		byte[] oldSha = file.getSha();
 		file.removeThisVersion(files);
 		removeRef(oldSha, file.getId());
+	}
+
+	/**
+	 * takes care of de-compression
+	 * 
+	 * @return an InputStream to _uncompressed_ data
+	 * @throws IOException
+	 */
+	InputStream getInputStream(GridFSDBFile file) throws IOException {
+		String store = (String) file.get("store");
+		if (store == null || "raw".equals(store))
+			return file.getInputStream();
+		if ("z".equals(store))
+			return new InflaterInputStream(file.getInputStream(), new Inflater(
+					true));
+		throw new IOException("unsupported storage scheme '" + store
+				+ "' on file " + file.getFilename());
 	}
 }

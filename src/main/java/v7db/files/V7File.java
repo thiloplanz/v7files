@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, Thilo Planz. All rights reserved.
+ * Copyright (c) 2011-2012, Thilo Planz. All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -123,11 +123,11 @@ public class V7File {
 		return null;
 	}
 
-	public InputStream getInputStream() {
+	public InputStream getInputStream() throws IOException {
 		if (getSha() == null)
 			return null;
 		loadGridFile();
-		return gridFile.getInputStream();
+		return gridFS.getInputStream(gridFile);
 	}
 
 	byte[] getSha() {
