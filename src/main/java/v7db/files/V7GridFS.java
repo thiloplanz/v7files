@@ -198,8 +198,10 @@ public class V7GridFS {
 	}
 
 	private byte[] insertContents(byte[] data, int offset, int len,
-			String filename, Object fileId, String contentType) {
-		byte[] sha = DigestUtils.sha(data);
+			String filename, Object fileId, String contentType)
+			throws IOException {
+		byte[] sha = DigestUtils
+				.sha(new ByteArrayInputStream(data, offset, len));
 
 		if (!contentAlreadyExists(sha)) {
 			byte[] compressed = new byte[len];
