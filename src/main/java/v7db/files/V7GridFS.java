@@ -53,6 +53,16 @@ public class V7GridFS {
 
 	private static final String bucket = "v7files";
 
+	/**
+	 * very small files are inlined (no chunks) we have no performance data yet
+	 * about what "small" should be, but probably very small in order not to
+	 * clutter the files collection
+	 * 
+	 * https://github.com/thiloplanz/v7files/wiki/Compression
+	 * https://jira.mongodb.org/browse/SERVER-4409
+	 */
+	private static final int inlineSize = 256;
+
 	private final DBCollection files;
 
 	private final GridFS fs;
@@ -185,6 +195,19 @@ public class V7GridFS {
 		return children;
 	}
 
+	private void insertInlineContents(byte[] data, String store, byte[] sha,
+			String filename, Object fileId, String contentType) {
+		GridFSInputFile file = fs.createFile(ArrayUtils.EMPTY_BYTE_ARRAY);
+		file.setFilename(filename);
+		file.setContentType(contentType);
+		file.put("_id", sha);
+		file.put("refs", new Object[] { fileId });
+		file.put("refHistory", file.get("refs"));
+		file.put("store", store);
+		file.put("in", data);
+		file.save();
+	}
+
 	private void insertDeflatedContents(InputStream deflatedData, byte[] sha,
 			String filename, Object fileId, String contentType) {
 		GridFSInputFile file = fs.createFile(deflatedData, true);
@@ -207,11 +230,22 @@ public class V7GridFS {
 			byte[] compressed = new byte[len];
 			int clen = Compression.deflate(data, offset, len, compressed);
 			if (clen > 0) {
+				if (clen <= inlineSize) {
+					insertInlineContents(ArrayUtils.subarray(compressed, 0,
+							clen), "zin", sha, filename + ".z", fileId,
+							contentType);
+					return sha;
+				}
 				insertDeflatedContents(new ByteArrayInputStream(compressed, 0,
 						clen), sha, filename, fileId, contentType);
 				return sha;
 			}
 			compressed = null;
+			if (len <= inlineSize) {
+				insertInlineContents(ArrayUtils.subarray(data, offset, offset
+						+ len), "in", sha, filename, fileId, contentType);
+				return sha;
+			}
 			GridFSInputFile file = fs.createFile(new ByteArrayInputStream(data,
 					offset, len), true);
 			file.setFilename(filename);
@@ -229,6 +263,14 @@ public class V7GridFS {
 
 	private byte[] insertContents(File data, String filename, Object fileId,
 			String contentType) throws IOException {
+
+		// avoid temporary files for small data
+		if (data.length() < 32 * 1024) {
+			byte[] smallData = FileUtils.readFileToByteArray(data);
+			return insertContents(smallData, 0, smallData.length, filename,
+					fileId, contentType);
+		}
+
 		FileInputStream fis = new FileInputStream(data);
 		byte[] sha = DigestUtils.sha(fis);
 		fis.close();
@@ -239,6 +281,7 @@ public class V7GridFS {
 				try {
 					insertDeflatedContents(new FileInputStream(compressed),
 							sha, filename, fileId, contentType);
+					return sha;
 				} finally {
 					compressed.delete();
 				}
@@ -450,6 +493,11 @@ public class V7GridFS {
 		if ("z".equals(store))
 			return new InflaterInputStream(file.getInputStream(), new Inflater(
 					true));
+		if ("zin".equals(store))
+			return new InflaterInputStream(new ByteArrayInputStream(
+					(byte[]) file.get("in")), new Inflater(true));
+		if ("in".equals(store))
+			return new ByteArrayInputStream((byte[]) file.get("in"));
 		throw new IOException("unsupported storage scheme '" + store
 				+ "' on file " + file.getFilename());
 	}
