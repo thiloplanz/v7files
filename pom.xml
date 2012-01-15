@@ -34,6 +34,9 @@
 					<basedir>${basedir}/src</basedir>
 					<header>${basedir}/src/license_header_agplv3.txt</header>
 					<strictCheck>true</strictCheck>
+					<excludes>
+						<exclude>**/arlut/**</exclude>
+					</excludes>
 				</configuration>
 			</plugin>
 			<plugin>
