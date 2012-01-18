@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, Thilo Planz. All rights reserved.
+ * Copyright (c) 2011-2012, Thilo Planz. All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,8 @@
 
 package v7db.files.milton;
 
+import java.util.Properties;
+
 import com.bradmcevoy.http.AuthenticationService;
 import com.bradmcevoy.http.ResourceFactory;
 import com.bradmcevoy.http.webdav.DefaultWebDavResponseHandler;
@@ -26,7 +28,17 @@ public class ResourceFactoryFactory implements
 		com.bradmcevoy.http.ResourceFactoryFactory {
 
 	public ResourceFactory createResourceFactory() {
-		return new v7db.files.milton.ResourceFactory();
+		Properties props = MiltonServlet.endpointProperties.get();
+
+		String mode = props.getProperty("v7files.tenants");
+		if ("single".equals(mode))
+			return new v7db.files.milton.ResourceFactory();
+
+		if ("path".equals(mode))
+			return new PathMultiTenantResourceFactory();
+
+		throw new IllegalArgumentException("unsupported tenancy mode: " + mode);
+
 	}
 
 	public WebDavResponseHandler createResponseHandler() {

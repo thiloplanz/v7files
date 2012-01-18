@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, Thilo Planz. All rights reserved.
+ * Copyright (c) 2011-2012, Thilo Planz. All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,8 +31,8 @@ import v7db.auth.AuthenticationToken;
 import v7db.files.AuthorisationProvider;
 import v7db.files.AuthorisationProviderFactory;
 import v7db.files.Configuration;
-import v7db.files.TenantManager;
 import v7db.files.V7File;
+import v7db.files.V7GridFS;
 
 import com.bradmcevoy.http.ApplicationConfig;
 import com.bradmcevoy.http.Auth;
@@ -48,6 +48,8 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private Mongo mongo;
 
+	private V7GridFS fs;
+
 	private String ROOT;
 
 	private String endpoint;
@@ -55,8 +57,6 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 	private String endpointName;
 
 	private Properties endpointProperties;
-
-	private TenantManager tenants;
 
 	private AuthenticationProvider authentication;
 
@@ -75,7 +75,9 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 			endpointProperties = Configuration.getEndpointProperties(endpoint);
 
-			tenants = new TenantManager(mongo, endpointProperties);
+			String dbName = getProperty("mongo.db");
+
+			fs = new V7GridFS(mongo.getDB(dbName));
 
 			ROOT = getProperty("root");
 			if (ROOT == null)
@@ -99,18 +101,20 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 		path = substringAfter(path, MiltonServlet.request().getServletPath());
 
+		if (!path.startsWith("/"))
+			throw new IllegalArgumentException(path + " "
+					+ MiltonServlet.request().getServletPath());
+
 		if ("/".equals(path)) {
-			V7File root = tenants.getFile(ROOT);
-			if (root == null)
-				return null;
-			return fakeLocking ? new LockableFolderResource(endpointName, root,
-					this) : new FolderResource(endpointName, root, this);
+			return fakeLocking ? new LockableFolderResource(endpointName, fs
+					.getFile(ROOT), this) : new FolderResource(endpointName, fs
+					.getFile(ROOT), this);
 		}
 
 		String[] p = path.split("/");
 		p[0] = ROOT;
 
-		V7File f = tenants.getFile(p);
+		V7File f = fs.getFile(p);
 		if (f == null)
 			return null;
 

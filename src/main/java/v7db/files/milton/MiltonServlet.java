@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, Thilo Planz. All rights reserved.
+ * Copyright (c) 2011-2012, Thilo Planz. All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package v7db.files.milton;
 
 import java.io.IOException;
+import java.util.Properties;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -41,6 +42,9 @@ import com.bradmcevoy.http.webdav.DefaultWebDavResponseHandler;
 public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 
 	private static Logger log = LoggerFactory.getLogger(MiltonServlet.class);
+
+	// our resourceFactoryFactory needs the endpoint configuration
+	final static ThreadLocal<Properties> endpointProperties = new ThreadLocal<Properties>();
 
 	private String dbName;
 
@@ -67,9 +71,14 @@ public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		String endpoint = config.getInitParameter("v7files.endpoint");
-		dbName = Configuration.getEndpointProperties(endpoint).getProperty(
-				"mongo.db");
-		super.init(config);
+		Properties ep = Configuration.getEndpointProperties(endpoint);
+		dbName = ep.getProperty("mongo.db");
+		try {
+			endpointProperties.set(ep);
+			super.init(config);
+		} finally {
+			endpointProperties.remove();
+		}
 		// http://stackoverflow.com/questions/8380324/
 		httpManager.getHandlers().setEnableExpectContinue(false);
 

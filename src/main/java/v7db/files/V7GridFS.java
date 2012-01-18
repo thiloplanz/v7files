@@ -72,7 +72,7 @@ public class V7GridFS {
 		fs = new GridFS(db, "v7.fs");
 	}
 
-	static V7GridFS getIfExists(Mongo mongo, String dbName) {
+	public static V7GridFS getIfExists(Mongo mongo, String dbName) {
 		return mongo.getDB(dbName).collectionExists(bucket) ? new V7GridFS(
 				mongo.getDB(dbName)) : null;
 	}
