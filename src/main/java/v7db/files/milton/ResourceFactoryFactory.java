@@ -32,7 +32,8 @@ public class ResourceFactoryFactory implements
 
 		String mode = props.getProperty("v7files.tenants");
 		if ("single".equals(mode))
-			return new v7db.files.milton.ResourceFactory();
+			return new v7db.files.milton.ResourceFactory(props
+					.getProperty("mongo.db"));
 
 		if ("path".equals(mode))
 			return new PathMultiTenantResourceFactory();

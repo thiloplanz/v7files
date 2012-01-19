@@ -36,8 +36,8 @@ public class PasswordUtil {
 			if ((str.startsWith("$1$") || str.startsWith("$apr1$"))
 					&& MD5Crypt.verifyPassword(new String(password), str))
 				return true;
-			if ((str.startsWith("{Crypt}") && check(password, StringUtils
-					.substringAfter(str, "{Crypt}"))))
+			if ((str.startsWith("{CRYPT}") && check(password, StringUtils
+					.substringAfter(str, "{CRYPT}"))))
 				return true;
 		}
 		return false;

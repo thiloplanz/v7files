@@ -60,10 +60,12 @@ public class PathMultiTenantResourceFactory implements
 			// must have at least [ ROOT, tenant ]
 			return null;
 		}
-		String tenant = path[1];
+		final String tenant = path[1];
 		MDC.put("tenant", tenant);
 		String realPath = "/"
 				+ substringAfter(p, servletPath + "/" + tenant + "/");
+
+		final String tenantDbName = tenant;
 
 		ResourceFactory t = paths.get(tenant);
 		if (t != null)
@@ -72,12 +74,12 @@ public class PathMultiTenantResourceFactory implements
 		// check if the tenant exists
 		V7GridFS fs = V7GridFS.getIfExists(mongo, tenant);
 		if (fs == null) {
-			log.warn("tried to access non-existing tenant " + path[1] + " for "
+			log.warn("tried to access non-existing tenant " + tenant + " for "
 					+ realPath);
 			return null;
 		}
 
-		t = new ResourceFactory();
+		t = new ResourceFactory(tenantDbName);
 		t.init(config, null);
 		paths.put(tenant, t);
 		return t.getResource(host, realPath);

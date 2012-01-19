@@ -28,6 +28,7 @@ import org.slf4j.MDC;
 import v7db.auth.AuthenticationProvider;
 import v7db.auth.AuthenticationProviderFactory;
 import v7db.auth.AuthenticationToken;
+import v7db.auth.MongoAuthenticationProvider;
 import v7db.files.AuthorisationProvider;
 import v7db.files.AuthorisationProviderFactory;
 import v7db.files.Configuration;
@@ -64,6 +65,12 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	private boolean fakeLocking = false;
 
+	private final String dbName;
+
+	ResourceFactory(String dbName) {
+		this.dbName = dbName;
+	}
+
 	public void init(ApplicationConfig config, HttpManager manager) {
 		try {
 			endpoint = config.getInitParameter("v7files.endpoint");
@@ -73,9 +80,10 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 			mongo = Configuration.getMongo();
 
-			endpointProperties = Configuration.getEndpointProperties(endpoint);
-
-			String dbName = getProperty("mongo.db");
+			endpointProperties = new Properties(Configuration
+					.getEndpointProperties(endpoint));
+			// need to adjust mongo.db in case of multi-tenant mode
+			endpointProperties.put("mongo.db", dbName);
 
 			fs = new V7GridFS(mongo.getDB(dbName));
 
@@ -83,8 +91,7 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			if (ROOT == null)
 				ROOT = endpoint;
 
-			authentication = AuthenticationProviderFactory
-					.getAuthenticationProvider(endpointProperties);
+			authentication = getAuthenticationProvider();
 
 			authorisation = AuthorisationProviderFactory
 					.getAuthorisationProvider(endpointProperties);
@@ -95,6 +102,16 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			throw new RuntimeException(e);
 		}
 
+	}
+
+	private AuthenticationProvider getAuthenticationProvider() {
+		String p = endpointProperties.getProperty("auth.provider");
+		if ("mongo".equals(p)) {
+			return new MongoAuthenticationProvider(mongo, endpointProperties);
+		}
+
+		return AuthenticationProviderFactory
+				.getAuthenticationProvider(endpointProperties);
 	}
 
 	public Resource getResource(String host, String path) {

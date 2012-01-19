@@ -27,7 +27,7 @@ public class PasswordUtilTest extends TestCase {
 		for (String crypted : new String[] {
 				// MD5Crypt.crypt("test")
 				"$1$YVUFc37R$fIe0aKUBxn4eVlGCfe0CS/",
-				"{Crypt}$1$YVUFc37R$fIe0aKUBxn4eVlGCfe0CS/" }) {
+				"{CRYPT}$1$YVUFc37R$fIe0aKUBxn4eVlGCfe0CS/" }) {
 			assertTrue(crypted, check("test".toCharArray(), crypted));
 			assertFalse(crypted, check("wrong".toCharArray(), crypted));
 		}
