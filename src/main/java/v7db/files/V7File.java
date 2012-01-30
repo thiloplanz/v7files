@@ -101,19 +101,6 @@ public class V7File {
 		return r;
 	}
 
-	WriteResult removeThisVersion(DBCollection collection) throws IOException {
-		DBObject find = new BasicDBObject("_id", metaData.get("_id")).append(
-				"_version", metaData.get("_version"));
-		WriteResult r = collection.remove(find);
-		if (r.getError() != null)
-			throw new IOException(r.getError());
-		if (r.getN() == 0)
-			throw new ConcurrentModificationException("version " + getVersion()
-					+ " is no longer the current version for file " + getId()
-					+ " (" + getName() + ")");
-		return r;
-	}
-
 	public V7File getParent() {
 		return parent;
 	}

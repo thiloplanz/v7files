@@ -36,7 +36,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.bson.BSONObject;
 import org.bson.types.ObjectId;
 
 import com.mongodb.BasicDBObject;
@@ -323,26 +322,14 @@ public class V7GridFS {
 			throw new IOException(error);
 	}
 
-	private DBObject thisVersion(BSONObject metaData) {
-		return new BasicDBObject("_id", metaData.get("_id")).append("_version",
-				metaData.get("_version"));
-	}
-
-	private int increaseVersion(DBObject metaData) {
-		int oldVersion = ((Number) metaData.get("_version")).intValue();
-		metaData.put("_version", oldVersion + 1);
-		metaData.put("updated_at", new Date());
-		return oldVersion;
-	}
-
 	void updateMetaData(DBObject metaData) throws IOException {
-		DBObject old = thisVersion(metaData);
-		increaseVersion(metaData);
+		metaData.put("updated_at", new Date());
+		try {
+			Vermongo.update(files, metaData);
+		} catch (UpdateConflictException e) {
+			throw new IOException(e);
+		}
 
-		WriteResult result = files.update(old, metaData);
-		String error = result.getError();
-		if (error != null)
-			throw new IOException(error);
 	}
 
 	private DBCollection getGridFSMetaCollection() {
@@ -507,8 +494,10 @@ public class V7GridFS {
 	}
 
 	void delete(V7File file) throws IOException {
+		// TODO: should check the version present in the db
 		byte[] oldSha = file.getSha();
-		file.removeThisVersion(files);
+		Vermongo.remove(files, file.getId(), new BasicDBObject("deleted_at",
+				new Date()));
 		removeRef(oldSha, file.getId());
 	}
 
