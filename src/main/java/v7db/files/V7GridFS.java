@@ -159,9 +159,17 @@ public class V7GridFS {
 			metaData.append("contentType", contentType);
 
 		if (data != null) {
-			byte[] sha = insertContents(data, offset, len, filename, metaData
-					.get("_id"), contentType);
-			metaData.append("sha", sha).append("length", len);
+			// for up to 31 bytes, storing the complete file inline
+			// takes less space than just storing the SHA-1 and length
+			// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32)
+			if (len < 32) {
+				metaData.append("in", ArrayUtils.subarray(data, offset, offset
+						+ len));
+			} else {
+				byte[] sha = insertContents(data, offset, len, filename,
+						metaData.get("_id"), contentType);
+				metaData.append("sha", sha).append("length", len);
+			}
 		}
 
 		insertMetaData(metaData);
@@ -170,6 +178,12 @@ public class V7GridFS {
 
 	public Object addFile(File data, Object parentFileId, String filename,
 			String contentType) throws IOException {
+		// avoid temporary files for small data
+		if (data != null && data.length() < 32 * 1024) {
+			byte[] smallData = FileUtils.readFileToByteArray(data);
+			return addFile(smallData, 0, smallData.length, parentFileId,
+					filename, contentType);
+		}
 		BasicDBObject metaData = new BasicDBObject("filename", filename)
 				.append("parent", parentFileId).append("_id", new ObjectId());
 
@@ -431,7 +445,8 @@ public class V7GridFS {
 		}
 	}
 
-	void updateContents(DBObject metaData, File contents) throws IOException {
+	private void updateContents(DBObject metaData, File contents)
+			throws IOException {
 
 		byte[] oldSha = (byte[]) metaData.get("sha");
 
@@ -448,10 +463,27 @@ public class V7GridFS {
 		removeRef(oldSha, metaData.get("_id"));
 	}
 
-	void updateContents(DBObject metaData, byte[] contents, int offset, int len)
-			throws IOException {
+	private void updateContents(DBObject metaData, byte[] contents, int offset,
+			int len) throws IOException {
 
 		byte[] oldSha = (byte[]) metaData.get("sha");
+		// for up to 31 bytes, storing the complete file inline
+		// takes less space than just storing the SHA-1 and length
+		// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32)
+		if (contents != null && len < 32) {
+			byte[] smallData = ArrayUtils.subarray(contents, offset, offset
+					+ len);
+			byte[] oldSmallData = (byte[]) metaData.get("in");
+			if (oldSmallData != null && Arrays.equals(oldSmallData, smallData))
+				return;
+
+			metaData.put("in", smallData);
+			metaData.removeField("sha");
+			metaData.removeField("length");
+			updateMetaData(metaData);
+			removeRef(oldSha, metaData.get("_id"));
+			return;
+		}
 
 		byte[] sha = insertContents(contents, offset, len, (String) metaData
 				.get("filename"), metaData.get("_id"), (String) metaData

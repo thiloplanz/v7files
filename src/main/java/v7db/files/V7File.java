@@ -17,6 +17,7 @@
 
 package v7db.files;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,6 +28,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -123,7 +125,14 @@ public class V7File {
 		return null;
 	}
 
+	private byte[] getInlineData() {
+		return (byte[]) metaData.get("in");
+	}
+
 	public InputStream getInputStream() throws IOException {
+		byte[] inline = getInlineData();
+		if (inline != null)
+			return new ByteArrayInputStream(inline);
 		if (getSha() == null)
 			return null;
 		loadGridFile();
@@ -131,11 +140,19 @@ public class V7File {
 	}
 
 	byte[] getSha() {
-		return (byte[]) metaData.get("sha");
+		byte[] sha = (byte[]) metaData.get("sha");
+		if (sha != null)
+			return sha;
+		byte[] data = getInlineData();
+		if (data != null) {
+			sha = DigestUtils.sha(data);
+			return sha;
+		}
+		return null;
 	}
 
 	public boolean hasContent() {
-		return getSha() != null;
+		return getInlineData() != null || getSha() != null;
 	}
 
 	public Long getLength() {
@@ -144,6 +161,9 @@ public class V7File {
 			return (Long) l;
 		if (l instanceof Number)
 			return ((Number) l).longValue();
+		byte[] data = getInlineData();
+		if (data != null)
+			return Long.valueOf(data.length);
 		return null;
 	}
 
