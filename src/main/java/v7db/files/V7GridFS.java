@@ -28,9 +28,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.Inflater;
-import java.util.zip.InflaterInputStream;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
@@ -518,27 +515,4 @@ public class V7GridFS {
 		removeRef(oldSha, file.getId());
 	}
 
-	/**
-	 * takes care of de-compression
-	 * 
-	 * @return an InputStream to _uncompressed_ data
-	 * @throws IOException
-	 */
-	InputStream getInputStream(GridFSDBFile file) throws IOException {
-		String store = (String) file.get("store");
-		if (store == null || "raw".equals(store))
-			return file.getInputStream();
-		if ("z".equals(store))
-			return new InflaterInputStream(file.getInputStream(), new Inflater(
-					true));
-		if ("zin".equals(store))
-			return new InflaterInputStream(new ByteArrayInputStream(
-					(byte[]) file.get("in")), new Inflater(true));
-		if ("in".equals(store))
-			return new ByteArrayInputStream((byte[]) file.get("in"));
-		if ("gz".equals(store))
-			return new GZIPInputStream(file.getInputStream());
-		throw new IOException("unsupported storage scheme '" + store
-				+ "' on file " + file.getFilename());
-	}
 }

@@ -24,6 +24,7 @@ import java.util.Date;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import v7db.files.V7File;
 
@@ -31,10 +32,12 @@ import com.bradmcevoy.http.Auth;
 import com.bradmcevoy.http.CollectionResource;
 import com.bradmcevoy.http.DeletableResource;
 import com.bradmcevoy.http.GetableResource;
+import com.bradmcevoy.http.HttpManager;
 import com.bradmcevoy.http.MoveableResource;
 import com.bradmcevoy.http.PropFindableResource;
 import com.bradmcevoy.http.Range;
 import com.bradmcevoy.http.Request;
+import com.bradmcevoy.http.Response;
 import com.bradmcevoy.http.Request.Method;
 import com.bradmcevoy.http.exceptions.BadRequestException;
 import com.bradmcevoy.http.exceptions.ConflictException;
@@ -78,6 +81,23 @@ class FileResource implements GetableResource, PropFindableResource,
 	public void sendContent(OutputStream out, Range range,
 			Map<String, String> params, String contentType) throws IOException,
 			NotAuthorizedException, BadRequestException, NotFoundException {
+
+		Request request = HttpManager.request();
+		if (StringUtils.contains(request.getAcceptEncodingHeader(), "gzip")) {
+			Long len = file.getGZipLength();
+			if (len != null) {
+				InputStream content = file.getInputStreamWithGzipContents();
+				Response response = HttpManager.response();
+				response
+						.setContentEncodingHeader(Response.ContentEncoding.GZIP);
+				response.setVaryHeader("Accept-Encoding");
+				response.setContentLengthHeader(len);
+				MiltonServlet.response().setContentLength(len.intValue());
+				IOUtils.copy(content, out);
+				return;
+			}
+		}
+
 		InputStream content = file.getInputStream();
 		if (content == null)
 			throw new BadRequestException("file has no contents");

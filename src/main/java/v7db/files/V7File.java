@@ -26,6 +26,9 @@ import java.io.OutputStream;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -116,6 +119,51 @@ public class V7File {
 		return (byte[]) metaData.get("in");
 	}
 
+	/**
+	 * useful to send gzipped contents directly to a client that supports it,
+	 * without having to uncompress it first.
+	 * 
+	 * @return the _compressed_ data (using gzip), if present, null if not (no
+	 *         on-the-fly compression is done)
+	 * 
+	 */
+
+	public InputStream getInputStreamWithGzipContents() throws IOException {
+		byte[] inline = getInlineData();
+		if (inline != null)
+			return null;
+		if (getSha() == null)
+			return null;
+		loadGridFile();
+		String store = (String) gridFile.get("store");
+		if ("gz".equals(store))
+			return gridFile.getInputStream();
+		return null;
+	}
+
+	/**
+	 * 
+	 * @return null, if the file is not stored using gzip
+	 */
+	public Long getGZipLength() {
+		byte[] inline = getInlineData();
+		if (inline != null)
+			return null;
+		if (getSha() == null)
+			return null;
+		loadGridFile();
+		String store = (String) gridFile.get("store");
+		if ("gz".equals(store))
+			return gridFile.getLength();
+		return null;
+	}
+
+	/**
+	 * takes care of de-compression
+	 * 
+	 * @return an InputStream to _uncompressed_ data
+	 * @throws IOException
+	 */
 	public InputStream getInputStream() throws IOException {
 		byte[] inline = getInlineData();
 		if (inline != null)
@@ -123,7 +171,21 @@ public class V7File {
 		if (getSha() == null)
 			return null;
 		loadGridFile();
-		return gridFS.getInputStream(gridFile);
+		String store = (String) gridFile.get("store");
+		if (store == null || "raw".equals(store))
+			return gridFile.getInputStream();
+		if ("z".equals(store))
+			return new InflaterInputStream(gridFile.getInputStream(),
+					new Inflater(true));
+		if ("zin".equals(store))
+			return new InflaterInputStream(new ByteArrayInputStream(
+					(byte[]) gridFile.get("in")), new Inflater(true));
+		if ("in".equals(store))
+			return new ByteArrayInputStream((byte[]) gridFile.get("in"));
+		if ("gz".equals(store))
+			return new GZIPInputStream(gridFile.getInputStream());
+		throw new IOException("unsupported storage scheme '" + store
+				+ "' on file " + getName());
 	}
 
 	byte[] getSha() {
