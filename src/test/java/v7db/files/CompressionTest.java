@@ -17,6 +17,9 @@
 
 package v7db.files;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.zip.DataFormatException;
 
@@ -39,6 +42,26 @@ public class CompressionTest extends TestCase {
 			byte[] tooSmall = new byte[5];
 			int len = Compression.deflate(data, 0, data.length, tooSmall);
 			assertEquals(0, len);
+		}
+	}
+
+	public void testGZipBytes() throws DataFormatException, IOException {
+		byte[] data = { 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+				1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3 };
+		{
+			byte[] out = Compression.gzip(data, 0, data.length);
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			Compression.gunzip(new ByteArrayInputStream(out), baos);
+
+			assertEquals(Arrays.toString(data), Arrays.toString(baos
+					.toByteArray()));
+			assertEquals(25, out.length);
+		}
+
+		{
+
+			assertNull("do not gzip data if that makes it larger", Compression
+					.gzip(data, 0, 5));
 		}
 	}
 

@@ -19,18 +19,29 @@ package v7db.files;
 
 import static java.util.zip.Deflater.BEST_COMPRESSION;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.Inflater;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class Compression {
+
+	// minimum overhead: 10 byte header, 8 byte trailer
+	static final int GZIP_STORAGE_OVERHEAD = 18;
+
+	static Logger log = LoggerFactory.getLogger(Compression.class);
 
 	/**
 	 * @return 0, if the "deflated" data fills the whole output array
@@ -43,6 +54,28 @@ class Compression {
 		if (size == 0 || size == out.length)
 			return 0;
 		return size;
+	}
+
+	/**
+	 * @return null, if the "gzipped" data is larger than the input (or there
+	 *         has been an exception)
+	 */
+	static byte[] gzip(byte[] data, int off, int len) {
+
+		if (len < GZIP_STORAGE_OVERHEAD)
+			return null;
+		try {
+			ByteArrayOutputStream baos = new ByteArrayOutputStream(data.length);
+			GZIPOutputStream gz = new GZIPOutputStream(baos);
+			gz.write(data, off, len);
+			gz.close();
+			if (baos.size() >= len)
+				return null;
+			return baos.toByteArray();
+		} catch (Exception e) {
+			log.error("failed to gzip byte array", e);
+			return null;
+		}
 	}
 
 	/**
@@ -60,24 +93,35 @@ class Compression {
 					+ size + " instead of " + out.length);
 	}
 
+	static void gunzip(InputStream in, OutputStream out) throws IOException {
+		IOUtils.copy(new GZIPInputStream(in), out);
+	}
+
 	/**
-	 * @return null, if the "deflated" data is bigger than the input, or the
-	 *         compressed file (delete after use)
-	 * @throws IOException
+	 * @return the compressed file (delete after use), or null, if the
+	 *         "compressed" data is bigger than the input (or if there was an
+	 *         exception)
 	 */
 
-	static File deflate(File data) throws IOException {
-		File file = File.createTempFile(data.getName(), ".z");
-		OutputStream out = new DeflaterOutputStream(new FileOutputStream(file),
-				new Deflater(BEST_COMPRESSION, true));
-		long size = FileUtils.copyFile(data, out);
-		out.close();
-		long cSize = file.length();
-		if (cSize < size) {
-			return file;
+	static File gzip(File data) {
+		File file = null;
+		try {
+			file = File.createTempFile(data.getName(), ".gz");
+			OutputStream out = new GZIPOutputStream(new FileOutputStream(file));
+			long size = FileUtils.copyFile(data, out);
+			out.close();
+			long cSize = file.length();
+			if (cSize < size) {
+				return file;
+			}
+			file.delete();
+			return null;
+		} catch (Exception e) {
+			log.error("failed to gzip file " + data, e);
+			if (file != null)
+				file.delete();
+			return null;
 		}
-		file.delete();
-		return null;
 	}
 
 }

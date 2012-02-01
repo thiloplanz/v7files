@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
@@ -221,15 +222,15 @@ public class V7GridFS {
 		file.save();
 	}
 
-	private void insertDeflatedContents(InputStream deflatedData, byte[] sha,
+	private void insertGzipContents(InputStream deflatedData, byte[] sha,
 			String filename, Object fileId, String contentType) {
 		GridFSInputFile file = fs.createFile(deflatedData, true);
-		file.setFilename(filename + ".z");
+		file.setFilename(filename + ".gz");
 		file.setContentType(contentType);
 		file.put("_id", sha);
 		file.put("refs", new Object[] { fileId });
 		file.put("refHistory", file.get("refs"));
-		file.put("store", "z");
+		file.put("store", "gz");
 		file.save();
 	}
 
@@ -240,25 +241,41 @@ public class V7GridFS {
 				.sha(new ByteArrayInputStream(data, offset, len));
 
 		if (!contentAlreadyExists(sha)) {
-			byte[] compressed = new byte[len];
-			int clen = Compression.deflate(data, offset, len, compressed);
-			if (clen > 0) {
-				if (clen <= inlineSize) {
-					insertInlineContents(ArrayUtils.subarray(compressed, 0,
-							clen), "zin", sha, filename + ".z", fileId,
-							contentType);
+			// try to deflate first to get the data inline
+			int clen = -1;
+			if (len < inlineSize * 20) {
+				byte[] compressed = new byte[len];
+				clen = Compression.deflate(data, offset, len, compressed);
+				if (clen > 0) {
+					// inline
+					if (clen <= inlineSize) {
+						insertInlineContents(ArrayUtils.subarray(compressed, 0,
+								clen), "zin", sha, filename + ".z", fileId,
+								contentType);
+						return sha;
+					}
+				}
+				compressed = null;
+			}
+
+			if (clen == -1
+					|| (clen > 0 && clen + Compression.GZIP_STORAGE_OVERHEAD < len)) {
+				// could not be inlined, but GZIP might work
+				byte[] compressed = Compression.gzip(data, offset, len);
+				if (compressed != null) {
+					insertGzipContents(new ByteArrayInputStream(compressed),
+							sha, filename, fileId, contentType);
 					return sha;
 				}
-				insertDeflatedContents(new ByteArrayInputStream(compressed, 0,
-						clen), sha, filename, fileId, contentType);
-				return sha;
+				compressed = null;
 			}
-			compressed = null;
+
 			if (len <= inlineSize) {
 				insertInlineContents(ArrayUtils.subarray(data, offset, offset
 						+ len), "in", sha, filename, fileId, contentType);
 				return sha;
 			}
+
 			GridFSInputFile file = fs.createFile(new ByteArrayInputStream(data,
 					offset, len), true);
 			file.setFilename(filename);
@@ -289,11 +306,11 @@ public class V7GridFS {
 		fis.close();
 
 		if (!contentAlreadyExists(sha)) {
-			final File compressed = Compression.deflate(data);
+			final File compressed = Compression.gzip(data);
 			if (compressed != null) {
 				try {
-					insertDeflatedContents(new FileInputStream(compressed),
-							sha, filename, fileId, contentType);
+					insertGzipContents(new FileInputStream(compressed), sha,
+							filename, fileId, contentType);
 					return sha;
 				} finally {
 					compressed.delete();
@@ -519,6 +536,8 @@ public class V7GridFS {
 					(byte[]) file.get("in")), new Inflater(true));
 		if ("in".equals(store))
 			return new ByteArrayInputStream((byte[]) file.get("in"));
+		if ("gz".equals(store))
+			return new GZIPInputStream(file.getInputStream());
 		throw new IOException("unsupported storage scheme '" + store
 				+ "' on file " + file.getFilename());
 	}
