@@ -34,6 +34,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.BSON;
+import org.bson.BSONObject;
 import org.bson.types.ObjectId;
 
 import com.mongodb.BasicDBObject;
@@ -124,6 +126,13 @@ public class V7GridFS {
 
 	GridFSDBFile findContent(byte[] sha) {
 		return fs.findOne(new BasicDBObject("_id", sha));
+	}
+
+	InputStream readContent(byte[] sha) throws IOException {
+		GridFSDBFile f = findContent(sha);
+		if (f == null)
+			return null;
+		return new V7File(f, this).getInputStream();
 	}
 
 	public boolean contentAlreadyExists(byte[] sha) {
@@ -231,6 +240,56 @@ public class V7GridFS {
 		file.save();
 	}
 
+	private boolean contains(List<?> list, BSONObject bson) {
+		if (list == null || list.isEmpty())
+			return false;
+		for (Object o : list) {
+			if (o instanceof BSONObject) {
+				BSONObject b = (BSONObject) o;
+				if (b.keySet().equals(bson.keySet())
+						&& Arrays.equals(BSON.encode(b), BSON.encode(bson)))
+					return true;
+			}
+		}
+		return false;
+	}
+
+	void registerAlt(byte[] sha, BSONObject alt, String filename,
+			Object fileId, String contentType) {
+		if (!alt.containsField("store"))
+			throw new IllegalArgumentException(
+					"must specify storage method in `store` field");
+		GridFSDBFile existing = findContent(sha);
+		if (existing == null) {
+			BasicDBObject x = new BasicDBObject();
+			x.put("_id", sha);
+			x.put("store", "alt");
+			x.put("alt", Arrays.asList(alt));
+			if (StringUtils.isNotBlank(filename))
+				x.put("filename", filename);
+			if (StringUtils.isNotBlank(contentType))
+				x.put("contentType", contentType);
+			if (fileId != null)
+				putRefs(x, fileId);
+
+			getGridFSMetaCollection().insert(x);
+		} else {
+			// check if the same alt is already there
+			List<?> existingAlt = (List<?>) existing.get("alt");
+			if (contains(existingAlt, alt)) {
+				addRefs(sha, fileId);
+				return;
+			}
+			addRefsAndAlt(sha, fileId, alt);
+
+		}
+	}
+
+	private void putRefs(BSONObject newFile, Object fileId) {
+		newFile.put("refs", new Object[] { fileId });
+		newFile.put("refHistory", newFile.get("refs"));
+	}
+
 	private byte[] insertContents(byte[] data, int offset, int len,
 			String filename, Object fileId, String contentType)
 			throws IOException {
@@ -278,8 +337,7 @@ public class V7GridFS {
 			file.setFilename(filename);
 			file.setContentType(contentType);
 			file.put("_id", sha);
-			file.put("refs", new Object[] { fileId });
-			file.put("refHistory", file.get("refs"));
+			putRefs(file, fileId);
 			file.save();
 		} else {
 			addRefs(sha, fileId);
@@ -352,11 +410,21 @@ public class V7GridFS {
 
 	// add a backreference to the GridFS file (for garbage collection)
 	private void addRefs(byte[] sha, Object fileId) {
-		getGridFSMetaCollection().update(
-				new BasicDBObject("_id", sha),
-				new BasicDBObject("$addToSet",
-						new BasicDBObject("refs", fileId).append("refHistory",
-								fileId)));
+		if (fileId != null)
+			getGridFSMetaCollection().update(
+					new BasicDBObject("_id", sha),
+					new BasicDBObject("$addToSet", new BasicDBObject("refs",
+							fileId).append("refHistory", fileId)));
+	}
+
+	private void addRefsAndAlt(byte[] sha, Object fileId, BSONObject alt) {
+		BasicDBObject addToSet = new BasicDBObject("alt", alt);
+		if (fileId != null)
+			addToSet.append("refs", fileId).append("refHistory", fileId);
+		if (fileId != null)
+			getGridFSMetaCollection().update(new BasicDBObject("_id", sha),
+					new BasicDBObject("$addToSet", addToSet));
+
 	}
 
 	// remove the current backreference (but keep the refHistory)
