@@ -254,6 +254,30 @@ public class V7GridFS {
 		return false;
 	}
 
+	private void checkRefBase(byte[] sha, BSONObject alt) {
+		// check if the "base" contents exist and add "refBase"
+		List<?> bases = (List<?>) alt.get("base");
+		if (bases != null) {
+			DBCollection bc = getGridFSMetaCollection();
+			for (Object base : bases) {
+
+				if (base instanceof BSONObject) {
+					Object id = ((BSONObject) base).get("_id");
+					long check = bc.count(new BasicDBObject("_id", id));
+					if (check == 0)
+						throw new IllegalArgumentException(
+								"base does not exist:"
+										+ Arrays
+												.deepToString(new Object[] { id }));
+					bc.update(new BasicDBObject("_id", id), new BasicDBObject(
+							"$addToSet", new BasicDBObject("refBase", sha)));
+				}
+
+			}
+		}
+
+	}
+
 	void registerAlt(byte[] sha, BSONObject alt, String filename,
 			Object fileId, String contentType) {
 		if (!alt.containsField("store"))
@@ -261,6 +285,7 @@ public class V7GridFS {
 					"must specify storage method in `store` field");
 		GridFSDBFile existing = findContent(sha);
 		if (existing == null) {
+			checkRefBase(sha, alt);
 			BasicDBObject x = new BasicDBObject();
 			x.put("_id", sha);
 			x.put("store", "alt");
@@ -280,6 +305,10 @@ public class V7GridFS {
 				addRefs(sha, fileId);
 				return;
 			}
+			// we don't check the ref-bases, because
+			// now this "alt" is optional
+			// when it gets "upgraded" to the primary
+			// representation, then we check them
 			addRefsAndAlt(sha, fileId, alt);
 
 		}
