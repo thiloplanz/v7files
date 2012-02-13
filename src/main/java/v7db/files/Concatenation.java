@@ -27,6 +27,7 @@ import java.util.Vector;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
@@ -114,6 +115,12 @@ class Concatenation {
 			Object fileId, String contentType, Object... pieces)
 			throws IOException {
 		DBObject cat = calculateConcatenation(gridFS, pieces);
+		// edge-case: became inline data only
+		if (cat.containsField("in")) {
+			return gridFS.insertContents((byte[]) cat.get("in"), filename,
+					fileId, contentType);
+		}
+
 		byte[] sha = (byte[]) cat.get("_id");
 		cat.removeField("_id");
 		gridFS.registerAlt(sha, cat, filename, fileId, contentType);
@@ -136,6 +143,28 @@ class Concatenation {
 			}
 		}
 		return null;
+	}
+
+	private static void addNestedPiece(V7GridFS gridFS, Object piece,
+			List<Object> bases, List<CountingInputStream> ins)
+			throws IOException {
+		if (piece instanceof BSONObject) {
+			// the reference to a base takes at least 30 bytes
+			// so for shorter segments, inline the data directly
+			// "_id" 3 + SHA 20 + "len" 3 + int32 4
+			int minLength = 30;
+			if (((BSONObject) piece).containsField("off"))
+				minLength += 7;
+			if (getPieceLength(piece) < minLength) {
+				addBytes(IOUtils
+						.toByteArray(getPieceInputStream(gridFS, piece)),
+						bases, ins);
+				return;
+			}
+		}
+
+		bases.add(piece);
+		ins.add(new CountingInputStream(getPieceInputStream(gridFS, piece)));
 	}
 
 	private static void addNestedConcats(V7GridFS gridFS,
@@ -168,9 +197,7 @@ class Concatenation {
 			if (left != null) {
 				if (plen < left) {
 					// include the whole rest
-					bases.add(n);
-					ins.add(new CountingInputStream(getPieceInputStream(gridFS,
-							n)));
+					addNestedPiece(gridFS, n, bases, ins);
 					left -= plen;
 					continue;
 				}
@@ -178,10 +205,7 @@ class Concatenation {
 					// include only a part
 					n = trimPieceToLength(n, left);
 				}
-				bases.add(n);
-				ins
-						.add(new CountingInputStream(getPieceInputStream(
-								gridFS, n)));
+				addNestedPiece(gridFS, n, bases, ins);
 				// no more pieces after this
 				return;
 			}
@@ -190,9 +214,23 @@ class Concatenation {
 		return;
 	}
 
+	private static void addBytes(byte[] piece, List<Object> bases,
+			List<CountingInputStream> ins) {
+		// consecutive byte arrays are concatenated directly
+		if (!bases.isEmpty()) {
+			Object prev = bases.get(bases.size() - 1);
+			if (prev instanceof byte[]) {
+				bases.set(bases.size() - 1, ArrayUtils.addAll((byte[]) prev,
+						piece));
+				return;
+			}
+		}
+		bases.add(piece);
+		ins.add(new CountingInputStream(new ByteArrayInputStream(piece)));
+	}
+
 	static DBObject calculateConcatenation(V7GridFS gridFS, Object... pieces)
 			throws IOException {
-		BasicDBObject result = new BasicDBObject();
 		Vector<CountingInputStream> ins = new Vector<CountingInputStream>(
 				pieces.length);
 		try {
@@ -200,15 +238,14 @@ class Concatenation {
 			for (Object piece : pieces) {
 				// raw data
 				if (piece instanceof byte[]) {
-					bases.add(piece);
-					ins.add(new CountingInputStream(new ByteArrayInputStream(
-							(byte[]) piece)));
+					addBytes((byte[]) piece, bases, ins);
 					continue;
 				}
 				if (piece instanceof BSONObject) {
 					BSONObject b = (BSONObject) piece;
-					Object id = b.get("_id");
-					if (id instanceof byte[]) {
+					Object _id = b.get("_id");
+					if (_id instanceof byte[]) {
+						byte[] id = (byte[]) _id;
 						Number offset = (Number) b.removeField("off");
 						Number length = (Number) b.removeField("len");
 
@@ -216,11 +253,27 @@ class Concatenation {
 							throw new IllegalArgumentException(
 									"invalid base object for concatenation (unsupported fields): "
 											+ piece);
-						GridFSDBFile f = gridFS.findContent((byte[]) id);
+
+						GridFSDBFile f = gridFS.findContent(id);
 						if (f == null)
 							throw new IOException(
 									"failed to find base content for concatenation in GridFS: "
-											+ Hex.encodeHexString((byte[]) id));
+											+ Hex.encodeHexString(id));
+
+						// the reference to a base takes at least 30 bytes
+						// so for shorter segments, inline the data directly
+						// "_id" 3 + SHA 20 + "len" 3 + int32 4
+						if (length != null) {
+							int minLength = 30;
+							if (offset != null)
+								minLength += 7;
+							if (length.intValue() < minLength) {
+								addBytes(IOUtils.toByteArray(gridFS
+										.readContent(f, offset, length)),
+										bases, ins);
+								continue;
+							}
+						}
 
 						BSONObject nestedConcat = findNestedConcat(f);
 						if (nestedConcat != null) {
@@ -245,24 +298,38 @@ class Concatenation {
 						"invalid base object for concatenation (unsupported type): "
 								+ piece);
 			}
+
+			// if this ended up as just one byte array,
+			// don't store it as a concatenation
+			if (bases.size() == 1) {
+				Object b = bases.get(0);
+				if (b instanceof byte[]) {
+					return new BasicDBObject("in", b);
+
+				}
+			}
+
 			SequenceInputStream in = new SequenceInputStream(ins.elements());
 			byte[] sha = DigestUtils.sha(in);
 			in.close();
+			BasicDBObject result = new BasicDBObject();
 			result.put("_id", sha);
 			for (int i = 0; i < bases.size(); i++) {
 				Object base = bases.get(i);
 				if (base instanceof BSONObject) {
-					((BSONObject) base).put("len", ins.get(i).getByteCount());
+					((BSONObject) base).put("len", (int) ins.get(i)
+							.getByteCount());
 				}
 			}
 			result.put("base", bases);
 			result.put("store", "cat");
+			return result;
 		} finally {
 			for (InputStream in : ins) {
 				in.close();
 			}
 		}
-		return result;
+
 	}
 
 	private static Object trimPieceToLength(Object piece, int length) {

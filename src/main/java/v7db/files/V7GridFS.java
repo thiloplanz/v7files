@@ -237,15 +237,17 @@ public class V7GridFS {
 
 	private void insertInlineContents(byte[] data, String store, byte[] sha,
 			String filename, Object fileId, String contentType) {
-		GridFSInputFile file = fs.createFile(ArrayUtils.EMPTY_BYTE_ARRAY);
-		file.setFilename(filename);
-		file.setContentType(contentType);
+
+		BasicDBObject file = new BasicDBObject();
+		if (StringUtils.isNotBlank(filename))
+			file.put("filename", filename);
+		if (StringUtils.isNotBlank(contentType))
+			file.put("contentType", contentType);
 		file.put("_id", sha);
-		file.put("refs", new Object[] { fileId });
-		file.put("refHistory", file.get("refs"));
+		putRefs(file, fileId);
 		file.put("store", store);
 		file.put("in", data);
-		file.save();
+		getGridFSMetaCollection().insert(file);
 	}
 
 	private void insertGzipContents(InputStream deflatedData, byte[] sha,
@@ -254,8 +256,7 @@ public class V7GridFS {
 		file.setFilename(filename + ".gz");
 		file.setContentType(contentType);
 		file.put("_id", sha);
-		file.put("refs", new Object[] { fileId });
-		file.put("refHistory", file.get("refs"));
+		putRefs(file, fileId);
 		file.put("store", "gz");
 		file.save();
 	}
@@ -335,8 +336,16 @@ public class V7GridFS {
 	}
 
 	private void putRefs(BSONObject newFile, Object fileId) {
-		newFile.put("refs", new Object[] { fileId });
-		newFile.put("refHistory", newFile.get("refs"));
+		if (fileId != null) {
+			newFile.put("refs", new Object[] { fileId });
+			newFile.put("refHistory", newFile.get("refs"));
+		}
+	}
+
+	byte[] insertContents(byte[] data, String filename, Object fileId,
+			String contentType) throws IOException {
+		return insertContents(data, 0, data.length, filename, fileId,
+				contentType);
 	}
 
 	private byte[] insertContents(byte[] data, int offset, int len,
@@ -401,8 +410,7 @@ public class V7GridFS {
 		// avoid temporary files for small data
 		if (data.length() < 32 * 1024) {
 			byte[] smallData = FileUtils.readFileToByteArray(data);
-			return insertContents(smallData, 0, smallData.length, filename,
-					fileId, contentType);
+			return insertContents(smallData, filename, fileId, contentType);
 		}
 
 		FileInputStream fis = new FileInputStream(data);
