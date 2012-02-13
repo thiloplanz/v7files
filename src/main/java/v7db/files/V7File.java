@@ -198,6 +198,32 @@ public class V7File {
 				+ "' on file " + getName());
 	}
 
+	InputStream getInputStream(Number _off, Number _len) throws IOException {
+		InputStream in = getInputStream();
+		if (in == null)
+			return null;
+		int off = 0;
+		if (_off != null)
+			off = _off.intValue();
+		if (off == 0 && _len == null)
+			return in;
+
+		// TODO: better implementation
+		if (off > 0)
+			IOUtils.skipFully(in, off);
+
+		if (_len == null)
+			return in;
+
+		int len = _len.intValue();
+		byte[] data = new byte[len];
+		int read = V7GridFS.readFully(in, data);
+		if (read < len)
+			throw new IOException("not enough data to read from " + getName()
+					+ ", off: " + off + " len: " + len);
+		return new ByteArrayInputStream(data);
+	}
+
 	byte[] getSha() {
 		byte[] sha = (byte[]) metaData.get("sha");
 		if (sha != null)
