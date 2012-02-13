@@ -135,6 +135,12 @@ public class V7GridFS {
 		return new V7File(f, this).getInputStream();
 	}
 
+	InputStream readContent(GridFSDBFile f) throws IOException {
+		if (f == null)
+			return null;
+		return new V7File(f, this).getInputStream();
+	}
+
 	public boolean contentAlreadyExists(byte[] sha) {
 		return null != findContent(sha);
 	}
