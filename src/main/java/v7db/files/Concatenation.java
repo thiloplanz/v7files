@@ -17,6 +17,12 @@
 
 package v7db.files;
 
+import static v7db.files.BSONUtils.getInteger;
+import static v7db.files.BSONUtils.getRequiredInt;
+import static v7db.files.BSONUtils.putIntegerOrLong;
+import static v7db.files.BSONUtils.removeField;
+import static v7db.files.BSONUtils.toInteger;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -169,7 +175,7 @@ class Concatenation {
 
 	private static void addNestedConcats(V7GridFS gridFS,
 			BSONObject nestedConcat, List<Object> bases,
-			List<CountingInputStream> ins, Number off, Number len)
+			List<CountingInputStream> ins, Integer off, Integer len)
 			throws IOException {
 		List<?> nestedBases = (List<?>) nestedConcat.get("base");
 
@@ -246,8 +252,8 @@ class Concatenation {
 					Object _id = b.get("_id");
 					if (_id instanceof byte[]) {
 						byte[] id = (byte[]) _id;
-						Number offset = (Number) b.removeField("off");
-						Number length = (Number) b.removeField("len");
+						Integer offset = toInteger(removeField(b, "off"));
+						Integer length = toInteger(removeField(b, "len"));
 
 						if (b.keySet().size() > 1)
 							throw new IllegalArgumentException(
@@ -282,8 +288,7 @@ class Concatenation {
 						} else {
 							BSONObject x = new BasicBSONObject("_id", id);
 							// "len" will be calculated automatically
-							if (offset != null)
-								x.put("off", offset.intValue());
+							putIntegerOrLong(x, "off", offset);
 							bases.add(x);
 							ins.add(new CountingInputStream(gridFS.readContent(
 									f, offset, length)));
@@ -317,7 +322,7 @@ class Concatenation {
 			for (int i = 0; i < bases.size(); i++) {
 				Object base = bases.get(i);
 				if (base instanceof BSONObject) {
-					((BSONObject) base).put("len", (int) ins.get(i)
+					putIntegerOrLong((BSONObject) base, "len", ins.get(i)
 							.getByteCount());
 				}
 			}
@@ -358,12 +363,12 @@ class Concatenation {
 
 		if (piece instanceof BSONObject) {
 			BSONObject b = (BSONObject) piece;
-			Number poffset = ((Number) b.get("off"));
+			Integer poffset = getInteger(b, "off");
 			if (poffset != null)
-				b.put("off", poffset.intValue() + offset);
+				b.put("off", poffset + offset);
 			else
 				b.put("off", offset);
-			b.put("len", ((Number) b.get("len")).intValue() - offset);
+			b.put("len", getRequiredInt(b, "len") - offset);
 			return b;
 		}
 		throw new IllegalArgumentException(
@@ -378,7 +383,7 @@ class Concatenation {
 
 		if (piece instanceof BSONObject) {
 			BSONObject b = (BSONObject) piece;
-			return ((Number) b.get("len")).intValue();
+			return getRequiredInt(b, "len");
 		}
 		throw new IllegalArgumentException(
 				"invalid base object for concatenation (unsupported type): "
@@ -395,15 +400,15 @@ class Concatenation {
 			BSONObject b = (BSONObject) piece;
 			Object id = b.get("_id");
 			if (id instanceof byte[]) {
-				Number offset = (Number) b.removeField("off");
-				if (b.keySet().size() > 2 || !b.containsField("len"))
+				Integer offset = toInteger(removeField(b, "off"));
+				if (b.keySet().size() > 2)
 					throw new IllegalArgumentException(
 							"invalid base object for concatenation (unsupported fields): "
 									+ piece);
 				int len = getPieceLength(piece);
 				int off = 0;
 				if (offset != null)
-					off = offset.intValue();
+					off = offset;
 				InputStream f = gridFS.readContent((byte[]) id, off, len);
 				if (f == null)
 					throw new IOException(

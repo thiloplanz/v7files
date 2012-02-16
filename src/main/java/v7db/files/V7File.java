@@ -95,7 +95,7 @@ public class V7File {
 	}
 
 	public int getVersion() {
-		return ((Number) metaData.get("_version")).intValue();
+		return BSONUtils.getRequiredInt(metaData, "_version");
 	}
 
 	WriteResult updateThisVersion(DBCollection collection, DBObject update)
@@ -198,7 +198,7 @@ public class V7File {
 				+ "' on file " + getName());
 	}
 
-	InputStream getInputStream(Number _off, Number _len) throws IOException {
+	InputStream getInputStream(Integer _off, Integer _len) throws IOException {
 		InputStream in = getInputStream();
 		if (in == null)
 			return null;

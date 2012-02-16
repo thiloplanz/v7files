@@ -148,7 +148,7 @@ public class V7GridFS {
 		return new V7File(f, this).getInputStream();
 	}
 
-	InputStream readContent(GridFSDBFile f, Number off, Number len)
+	InputStream readContent(GridFSDBFile f, Integer off, Integer len)
 			throws IOException {
 		if (f == null)
 			return null;
