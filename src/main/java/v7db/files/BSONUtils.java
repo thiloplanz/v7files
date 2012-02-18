@@ -34,7 +34,7 @@ import org.bson.BSONObject;
  * 
  */
 
-public class BSONUtils {
+class BSONUtils {
 
 	private static <T> T notNull(T x) {
 		if (x == null)
@@ -88,7 +88,7 @@ public class BSONUtils {
 		return x;
 	}
 
-	public static Long toLong(Object x) {
+	static Long toLong(Object x) {
 		if (x == null)
 			return null;
 		if (x instanceof Long)
@@ -99,10 +99,9 @@ public class BSONUtils {
 			return Long.valueOf((String) x);
 		throw new IllegalArgumentException("cannot convert `" + x
 				+ "` into a Long");
-
 	}
 
-	public static Integer toInteger(Object x) {
+	static Integer toInteger(Object x) {
 		if (x == null)
 			return null;
 		if (x instanceof Integer)
@@ -113,22 +112,37 @@ public class BSONUtils {
 			return Integer.valueOf((String) x);
 		throw new IllegalArgumentException("cannot convert `" + x
 				+ "` into a Long");
-
 	}
 
-	public static Long getLong(BSONObject b, String fieldName) {
+	static String toString(Object x) {
+		if (x == null)
+			return null;
+		if (x instanceof String)
+			return (String) x;
+		if (x instanceof Number)
+			return x.toString();
+
+		throw new IllegalArgumentException("cannot convert `" + x
+				+ "` into a String");
+	}
+
+	static Long getLong(BSONObject b, String fieldName) {
 		return toLong(get(b, fieldName));
 	}
 
-	public static Integer getInteger(BSONObject b, String fieldName) {
+	static Integer getInteger(BSONObject b, String fieldName) {
 		return toInteger(get(b, fieldName));
 	}
 
-	public static int getRequiredInt(BSONObject b, String fieldName) {
+	static int getRequiredInt(BSONObject b, String fieldName) {
 		return toInteger(getRequired(b, fieldName)).intValue();
 	}
 
-	public static Object removeField(BSONObject b, String fieldName) {
+	static String getString(BSONObject b, String fieldName) {
+		return toString(get(b, fieldName));
+	}
+
+	static Object removeField(BSONObject b, String fieldName) {
 		if (fieldName.contains("."))
 			throw new UnsupportedOperationException("not yet implemented");
 		return b.removeField(fieldName);
@@ -145,10 +159,22 @@ public class BSONUtils {
 		}
 	}
 
-	public static Long putLong(BSONObject b, String fieldName, Object x) {
+	static Integer putInteger(BSONObject b, String fieldName, Object x) {
+		Integer i = toInteger(x);
+		put(b, fieldName, i);
+		return i;
+	}
+
+	static Long putLong(BSONObject b, String fieldName, Object x) {
 		Long l = toLong(x);
 		put(b, fieldName, l);
 		return l;
+	}
+
+	static String putString(BSONObject b, String fieldName, Object x) {
+		String s = toString(x);
+		put(b, fieldName, s);
+		return s;
 	}
 
 	private static final Long MAX_INT = Long.valueOf(Integer.MAX_VALUE);
@@ -159,8 +185,10 @@ public class BSONUtils {
 	 * space in the database, but you lose the ability to sort or do range
 	 * queries.
 	 */
-	public static Number putIntegerOrLong(BSONObject b, String fieldName,
-			Object x) {
+	static Number putIntegerOrLong(BSONObject b, String fieldName, Object x) {
+		if (x instanceof Integer)
+			return putInteger(b, fieldName, x);
+
 		Long l = toLong(x);
 		if (l == null) {
 			removeField(b, fieldName);

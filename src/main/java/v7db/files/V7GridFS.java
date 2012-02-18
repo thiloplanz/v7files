@@ -404,7 +404,7 @@ public class V7GridFS {
 		return sha;
 	}
 
-	private byte[] insertContents(File data, String filename, Object fileId,
+	byte[] insertContents(File data, String filename, Object fileId,
 			String contentType) throws IOException {
 
 		// avoid temporary files for small data

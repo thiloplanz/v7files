@@ -58,9 +58,9 @@ import com.mongodb.gridfs.GridFSDBFile;
  *                    //  but is always given (to make it possible to skip chunks)
  *             { _id: BinData(...), len: 1234, off: 12 }
  *                    // also possible to specify an offset
- *             { _id: BinData(...), len: 1234, store: 'gzip', off: 123, end: 999 }
+ *             { _id: BinData(...), len: 1234, store: 'zip', off: 123, end: 999 }
  *                    // treat the segment segment specified by off/end 
- *                    // as gzip data, "len" is the result length
+ *                    // as a zip file entry, "len" is the uncompressed data length
  * 
  * </pre>
  * 
@@ -91,6 +91,22 @@ class Concatenation {
 		BSONObject x = OutOfBand.basedOnGridFSContents(sha);
 		x.put("len", len);
 		x.put("off", off);
+		return x;
+	}
+
+	/**
+	 * concatenate a piece from existing GridFS content, treating it as a zip
+	 * file entry (including the header)
+	 * 
+	 * @return an object for use in
+	 *         {@link #storeConcatenation(V7GridFS, String, Object, String, Object...)}
+	 */
+	static Object zipEntryInGridFSContents(byte[] sha, int off, int lenHeader,
+			int lenData) {
+		BSONObject x = OutOfBand.basedOnGridFSContents(sha);
+		x.put("end", off + lenHeader + lenData);
+		x.put("off", off);
+		x.put("store", "zip");
 		return x;
 	}
 
@@ -235,6 +251,19 @@ class Concatenation {
 		ins.add(new CountingInputStream(new ByteArrayInputStream(piece)));
 	}
 
+	private static String getStore(BSONObject b) {
+		String store = BSONUtils.toString(removeField(b, "store"));
+		if ("raw".equals(store))
+			store = null;
+
+		if (store != null && !"zip".equals(store)) {
+			throw new IllegalArgumentException(
+					"invalid base object for concatenation (unsupported store type): "
+							+ store);
+		}
+		return store;
+	}
+
 	static DBObject calculateConcatenation(V7GridFS gridFS, Object... pieces)
 			throws IOException {
 		Vector<CountingInputStream> ins = new Vector<CountingInputStream>(
@@ -254,6 +283,17 @@ class Concatenation {
 						byte[] id = (byte[]) _id;
 						Integer offset = toInteger(removeField(b, "off"));
 						Integer length = toInteger(removeField(b, "len"));
+						Integer end = null;
+
+						String store = getStore(b);
+
+						if (store != null) {
+							end = toInteger(removeField(b, "end"));
+							if (end == null)
+								throw new IllegalArgumentException(
+										"invalid base object for concatenation (missing 'end' parameter for store type "
+												+ store + ")");
+						}
 
 						if (b.keySet().size() > 1)
 							throw new IllegalArgumentException(
@@ -289,9 +329,18 @@ class Concatenation {
 							BSONObject x = new BasicBSONObject("_id", id);
 							// "len" will be calculated automatically
 							putIntegerOrLong(x, "off", offset);
+							BSONUtils.putString(x, "store", store);
+							if ("zip".equals(store)) {
+								putIntegerOrLong(x, "end", end);
+								ins.add(new CountingInputStream(Compression
+										.unzip(gridFS.readContent(f, offset,
+												length))));
+							} else {
+								ins.add(new CountingInputStream(gridFS
+										.readContent(f, offset, length)));
+							}
 							bases.add(x);
-							ins.add(new CountingInputStream(gridFS.readContent(
-									f, offset, length)));
+
 						}
 						continue;
 					}
@@ -390,6 +439,28 @@ class Concatenation {
 						+ piece);
 	}
 
+	private static InputStream getCompressedPieceInputStream(V7GridFS gridFS,
+			BSONObject piece, byte[] id, String store, Integer offset)
+			throws IOException {
+		int end = getRequiredInt(piece, "end");
+		if (piece.keySet().size() > 3)
+			throw new IllegalArgumentException(
+					"invalid base object for concatenation (unsupported fields): "
+							+ piece);
+
+		int off = 0;
+		if (offset != null)
+			off = offset;
+		int len = end - off;
+		InputStream f = gridFS.readContent(id, off, len);
+		if (f == null)
+			throw new IOException(
+					"failed to find base content for concatenation in GridFS: "
+							+ Hex.encodeHexString(id));
+		return Compression.unzip(f);
+
+	}
+
 	private static InputStream getPieceInputStream(V7GridFS gridFS, Object piece)
 			throws IOException {
 		// raw data
@@ -401,6 +472,12 @@ class Concatenation {
 			Object id = b.get("_id");
 			if (id instanceof byte[]) {
 				Integer offset = toInteger(removeField(b, "off"));
+				String store = getStore(b);
+				if (store != null) {
+					return getCompressedPieceInputStream(gridFS, b,
+							(byte[]) id, store, offset);
+				}
+
 				if (b.keySet().size() > 2)
 					throw new IllegalArgumentException(
 							"invalid base object for concatenation (unsupported fields): "

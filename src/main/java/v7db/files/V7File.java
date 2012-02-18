@@ -194,6 +194,8 @@ public class V7File {
 			return new GZIPInputStream(gridFile.getInputStream());
 		if ("alt".equals(store))
 			return OutOfBand.getInputStream(gridFS, gridFile);
+		if ("zip".equals(store))
+			return Compression.unzip(gridFile.getInputStream());
 		throw new IOException("unsupported storage scheme '" + store
 				+ "' on file " + getName());
 	}

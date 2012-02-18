@@ -30,6 +30,7 @@ import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.Inflater;
+import java.util.zip.ZipInputStream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -95,6 +96,17 @@ class Compression {
 
 	static void gunzip(InputStream in, OutputStream out) throws IOException {
 		IOUtils.copy(new GZIPInputStream(in), out);
+	}
+
+	/**
+	 * input must be in zip format, i.e. first a local header, and then the data
+	 * segment.
+	 * 
+	 */
+	static InputStream unzip(InputStream in) throws IOException {
+		ZipInputStream zip = new ZipInputStream(in);
+		zip.getNextEntry();
+		return zip;
 	}
 
 	/**
