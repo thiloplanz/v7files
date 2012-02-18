@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011, Thilo Planz. All rights reserved.
+ * Copyright (c) 2011-2012, Thilo Planz. All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,11 +22,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-
-import v7db.files.milton.MiltonServlet;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class Main {
 
@@ -36,55 +33,44 @@ public class Main {
 	 */
 	public static void main(String[] args) throws Exception {
 
-		if (args.length == 2 && "-f".equals(args[0])) {
-			File configFile = new File(args[1]);
-			Properties config = new Properties();
-			config.load(new FileInputStream(configFile));
-			Configuration.init(config);
-		} else if (args.length == 0) {
-			Configuration.init(null);
-		} else {
-			System.err.println("v7files [-f config.properties]");
+		// find a [-f config.properties]
+		File configFile = null;
+		{
+			int flag = ArrayUtils.indexOf(args, "-f");
+			if (flag > -1) {
+				configFile = new File(args[flag + 1]);
+				args = ArrayUtils.remove(ArrayUtils.remove(args, flag + 1),
+						flag);
+			}
+		}
+
+		if (args.length == 0) {
+			System.err.println("v7files [-f config.properties] <command>");
 			System.exit(1);
 		}
 
-		ServletContextHandler handler = new ServletContextHandler();
-		handler.setContextPath("/");
+		String command = args[0];
 
-		String[] endpoints = Configuration
-				.getArrayProperty("v7files.endpoints");
-
-		for (String endpoint : endpoints) {
-
-			ServletHolder servlet = new ServletHolder(new MiltonServlet());
-			servlet.setInitParameter("v7files.endpoint", endpoint);
-			servlet
-					.setInitParameter(
-							"resource.factory.factory.class",
-							Configuration
-									.getProperty("resource.factory.factory.class"));
-
-			handler.addServlet(servlet, endpoint.equals("/") ? "/*"
-					: (endpoint + "/*"));
-		}
-		int port = Integer.parseInt(Configuration.getProperty("http.port"));
-		final Server server = new Server(port);
-		server.setHandler(handler);
-
-		server.start();
-
+		Class<?> commandClass;
 		try {
-			System.in.read();
-			server.stop();
-		} catch (IOException e) {
-			System.err
-					.println("STDIN unavailable, continue running in daemon mode");
-			try {
-				synchronized (args) {
-					args.wait(); // forever
-				}
-			} catch (InterruptedException e1) {
-			}
+			commandClass = Class.forName("v7db.files."
+					+ StringUtils.capitalize(command) + "Command");
+		} catch (ClassNotFoundException e) {
+			System.err.println("unsupported command '" + command + "'");
+			System.exit(1);
+			return;
 		}
+
+		if (configFile != null) {
+			Properties config = new Properties();
+			config.load(new FileInputStream(configFile));
+			Configuration.init(config);
+		} else {
+			Configuration.init(null);
+		}
+
+		commandClass.getMethod("main", String[].class).invoke(null,
+				(Object) args);
+
 	}
 }
