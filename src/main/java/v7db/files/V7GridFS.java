@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -126,6 +127,31 @@ public class V7GridFS {
 
 	GridFSDBFile findContent(byte[] sha) {
 		return fs.findOne(new BasicDBObject("_id", sha));
+	}
+
+	GridFSDBFile findContentByPrefix(byte[] sha) {
+		if (sha.length == 20)
+			return findContent(sha);
+
+		if (sha.length > 20)
+			throw new IllegalArgumentException();
+
+		byte[] lower = Arrays.copyOf(sha, 20); // 0-padded
+		byte[] higher = Arrays.copyOf(sha, 20); // FF-padded
+		for (int i = sha.length; i < higher.length; i++) {
+			higher[i] = (byte) 0xFF;
+		}
+
+		List<DBObject> files = getGridFSMetaCollection().find(
+				QueryUtils.between("_id", lower, higher), new BasicDBObject())
+				.limit(2).toArray();
+		if (files.isEmpty())
+			return null;
+		if (files.size() == 1)
+			return findContent((byte[]) files.get(0).get("_id"));
+		throw new IllegalArgumentException(Hex.encodeHexString(sha)
+				+ " is not a unique SHA prefix");
+
 	}
 
 	InputStream readContent(byte[] sha) throws IOException {

@@ -25,7 +25,6 @@ import org.bson.BSONObject;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
-import com.mongodb.QueryOperators;
 import com.mongodb.WriteConcern;
 import com.mongodb.WriteResult;
 
@@ -215,11 +214,9 @@ class Vermongo {
 	 * @return the list of old version of the document with the given id
 	 */
 	static List<DBObject> getOldVersions(DBCollection c, Object id) {
-		BasicDBObject query = new BasicDBObject("_id", new BasicDBObject(
-				QueryOperators.GT, new BasicDBObject("_id", id).append(
-						"_version", 0)).append(QueryOperators.LT,
-				new BasicDBObject("_id", id).append("_version",
-						Integer.MAX_VALUE)));
+		DBObject query = QueryUtils.between("_id", new BasicDBObject("_id", id)
+				.append("_version", 0), new BasicDBObject("_id", id).append(
+				"_version", Integer.MAX_VALUE));
 
 		List<DBObject> result = new ArrayList<DBObject>();
 		for (DBObject o : getShadowCollection(c).find(query).sort(
