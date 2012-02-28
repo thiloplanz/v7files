@@ -48,7 +48,8 @@ public class ZipFile {
 	public static Object addZipFile(V7GridFS fs, File zipFile,
 			Object parentFileId, String filename) throws IOException {
 		// make sure we have the contents first
-		byte[] sha = fs.insertContents(zipFile, filename, null, CONTENT_TYPE);
+		byte[] sha = fs.storage.insertContents(zipFile, filename, null,
+				CONTENT_TYPE);
 
 		try {
 			// open up the zip file
@@ -66,8 +67,8 @@ public class ZipFile {
 				en.getInputStream();
 				LocalFileHeader lh = en.getLocalFileHeader();
 
-				Concatenation.storeConcatenation(fs, lh.getFileName(), null,
-						null, Concatenation.zipEntryInGridFSContents(sha,
+				Concatenation.storeConcatenation(fs.storage, lh.getFileName(),
+						null, null, Concatenation.zipEntryInGridFSContents(sha,
 								(int) fh.getOffsetLocalHeader(), (int) (lh
 										.getOffsetStartOfData() - fh
 										.getOffsetLocalHeader()), (int) lh

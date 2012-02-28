@@ -50,6 +50,8 @@ public class V7File {
 
 	private final V7GridFS gridFS;
 
+	private final GridFSContentStorage storage;
+
 	private final DBObject metaData;
 
 	private final V7File parent;
@@ -58,23 +60,25 @@ public class V7File {
 		this.gridFS = gridFS;
 		this.metaData = metaData;
 		this.parent = parent;
+		storage = gridFS != null ? gridFS.storage : null;
 	}
 
 	static V7File lazy(V7GridFS gridFS, Object id) {
 		return new V7File(gridFS, new BasicDBObject("_id", id), null);
 	}
 
-	V7File(GridFSDBFile gridFile, V7GridFS gridFS) {
+	V7File(GridFSDBFile gridFile, GridFSContentStorage storage) {
 		this.gridFile = gridFile;
 		this.metaData = new BasicDBObject("filename", gridFile.getFilename())
 				.append("sha", gridFile.get("_id"));
 		this.parent = null;
-		this.gridFS = gridFS;
+		this.gridFS = null;
+		this.storage = storage;
 	}
 
 	private void loadGridFile() {
 		if (gridFile == null)
-			gridFile = gridFS.findContent(getSha());
+			gridFile = storage.findContent(getSha());
 	}
 
 	public String getContentType() {
@@ -193,7 +197,7 @@ public class V7File {
 		if ("gz".equals(store))
 			return new GZIPInputStream(gridFile.getInputStream());
 		if ("alt".equals(store))
-			return OutOfBand.getInputStream(gridFS, gridFile);
+			return OutOfBand.getInputStream(storage, gridFile);
 		if ("zip".equals(store))
 			return Compression.unzip(gridFile.getInputStream());
 		throw new IOException("unsupported storage scheme '" + store

@@ -37,8 +37,8 @@ class OutOfBand {
 	 * @throws IOException
 	 */
 	@SuppressWarnings("unchecked")
-	static InputStream getInputStream(V7GridFS gridFS, BSONObject gridFile)
-			throws IOException {
+	static InputStream getInputStream(GridFSContentStorage storage,
+			BSONObject gridFile) throws IOException {
 		List<BSONObject> alt = (List<BSONObject>) gridFile.get("alt");
 		if (alt == null || alt.isEmpty())
 			throw new IOException(
@@ -49,7 +49,7 @@ class OutOfBand {
 			try {
 				String store = (String) o.get("store");
 				if ("cat".equals(store))
-					return Concatenation.getInputStream(gridFS, o);
+					return Concatenation.getInputStream(storage, o);
 				throw new IOException("unsupported storage scheme '" + store
 						+ "' on file "
 						+ Hex.encodeHexString((byte[]) gridFile.get("_id")));

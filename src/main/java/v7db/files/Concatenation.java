@@ -133,19 +133,19 @@ class Concatenation {
 	 * @return the SHA1 for the concatenation
 	 * @throws IOException
 	 */
-	static byte[] storeConcatenation(V7GridFS gridFS, String filename,
-			Object fileId, String contentType, Object... pieces)
-			throws IOException {
-		DBObject cat = calculateConcatenation(gridFS, pieces);
+	static byte[] storeConcatenation(GridFSContentStorage storage,
+			String filename, Object fileId, String contentType,
+			Object... pieces) throws IOException {
+		DBObject cat = calculateConcatenation(storage, pieces);
 		// edge-case: became inline data only
 		if (cat.containsField("in")) {
-			return gridFS.insertContents((byte[]) cat.get("in"), filename,
+			return storage.insertContents((byte[]) cat.get("in"), filename,
 					fileId, contentType);
 		}
 
 		byte[] sha = (byte[]) cat.get("_id");
 		cat.removeField("_id");
-		gridFS.registerAlt(sha, cat, filename, fileId, contentType);
+		storage.registerAlt(sha, cat, filename, fileId, contentType);
 
 		return sha;
 	}
@@ -167,8 +167,8 @@ class Concatenation {
 		return null;
 	}
 
-	private static void addNestedPiece(V7GridFS gridFS, Object piece,
-			List<Object> bases, List<CountingInputStream> ins)
+	private static void addNestedPiece(GridFSContentStorage storage,
+			Object piece, List<Object> bases, List<CountingInputStream> ins)
 			throws IOException {
 		if (piece instanceof BSONObject) {
 			// the reference to a base takes at least 30 bytes
@@ -179,17 +179,17 @@ class Concatenation {
 				minLength += 7;
 			if (getPieceLength(piece) < minLength) {
 				addBytes(IOUtils
-						.toByteArray(getPieceInputStream(gridFS, piece)),
+						.toByteArray(getPieceInputStream(storage, piece)),
 						bases, ins);
 				return;
 			}
 		}
 
 		bases.add(piece);
-		ins.add(new CountingInputStream(getPieceInputStream(gridFS, piece)));
+		ins.add(new CountingInputStream(getPieceInputStream(storage, piece)));
 	}
 
-	private static void addNestedConcats(V7GridFS gridFS,
+	private static void addNestedConcats(GridFSContentStorage storage,
 			BSONObject nestedConcat, List<Object> bases,
 			List<CountingInputStream> ins, Integer off, Integer len)
 			throws IOException {
@@ -219,7 +219,7 @@ class Concatenation {
 			if (left != null) {
 				if (plen < left) {
 					// include the whole rest
-					addNestedPiece(gridFS, n, bases, ins);
+					addNestedPiece(storage, n, bases, ins);
 					left -= plen;
 					continue;
 				}
@@ -227,7 +227,7 @@ class Concatenation {
 					// include only a part
 					n = trimPieceToLength(n, left);
 				}
-				addNestedPiece(gridFS, n, bases, ins);
+				addNestedPiece(storage, n, bases, ins);
 				// no more pieces after this
 				return;
 			}
@@ -264,8 +264,8 @@ class Concatenation {
 		return store;
 	}
 
-	static DBObject calculateConcatenation(V7GridFS gridFS, Object... pieces)
-			throws IOException {
+	static DBObject calculateConcatenation(GridFSContentStorage storage,
+			Object... pieces) throws IOException {
 		Vector<CountingInputStream> ins = new Vector<CountingInputStream>(
 				pieces.length);
 		try {
@@ -300,7 +300,7 @@ class Concatenation {
 									"invalid base object for concatenation (unsupported fields): "
 											+ piece);
 
-						GridFSDBFile f = gridFS.findContent(id);
+						GridFSDBFile f = storage.findContent(id);
 						if (f == null)
 							throw new IOException(
 									"failed to find base content for concatenation in GridFS: "
@@ -314,7 +314,7 @@ class Concatenation {
 							if (offset != null)
 								minLength += 7;
 							if (length.intValue() < minLength) {
-								addBytes(IOUtils.toByteArray(gridFS
+								addBytes(IOUtils.toByteArray(storage
 										.readContent(f, offset, length)),
 										bases, ins);
 								continue;
@@ -323,7 +323,7 @@ class Concatenation {
 
 						BSONObject nestedConcat = findNestedConcat(f);
 						if (nestedConcat != null) {
-							addNestedConcats(gridFS, nestedConcat, bases, ins,
+							addNestedConcats(storage, nestedConcat, bases, ins,
 									offset, length);
 						} else {
 							BSONObject x = new BasicBSONObject("_id", id);
@@ -333,10 +333,10 @@ class Concatenation {
 							if ("zip".equals(store)) {
 								putIntegerOrLong(x, "end", end);
 								ins.add(new CountingInputStream(Compression
-										.unzip(gridFS.readContent(f, offset,
+										.unzip(storage.readContent(f, offset,
 												length))));
 							} else {
-								ins.add(new CountingInputStream(gridFS
+								ins.add(new CountingInputStream(storage
 										.readContent(f, offset, length)));
 							}
 							bases.add(x);
@@ -439,9 +439,9 @@ class Concatenation {
 						+ piece);
 	}
 
-	private static InputStream getCompressedPieceInputStream(V7GridFS gridFS,
-			BSONObject piece, byte[] id, String store, Integer offset)
-			throws IOException {
+	private static InputStream getCompressedPieceInputStream(
+			GridFSContentStorage storage, BSONObject piece, byte[] id,
+			String store, Integer offset) throws IOException {
 		int end = getRequiredInt(piece, "end");
 		if (piece.keySet().size() > 3)
 			throw new IllegalArgumentException(
@@ -452,7 +452,7 @@ class Concatenation {
 		if (offset != null)
 			off = offset;
 		int len = end - off;
-		InputStream f = gridFS.readContent(id, off, len);
+		InputStream f = storage.readContent(id, off, len);
 		if (f == null)
 			throw new IOException(
 					"failed to find base content for concatenation in GridFS: "
@@ -461,8 +461,8 @@ class Concatenation {
 
 	}
 
-	private static InputStream getPieceInputStream(V7GridFS gridFS, Object piece)
-			throws IOException {
+	private static InputStream getPieceInputStream(
+			GridFSContentStorage storage, Object piece) throws IOException {
 		// raw data
 		if (piece instanceof byte[])
 			return new ByteArrayInputStream((byte[]) piece);
@@ -474,7 +474,7 @@ class Concatenation {
 				Integer offset = toInteger(removeField(b, "off"));
 				String store = getStore(b);
 				if (store != null) {
-					return getCompressedPieceInputStream(gridFS, b,
+					return getCompressedPieceInputStream(storage, b,
 							(byte[]) id, store, offset);
 				}
 
@@ -486,7 +486,7 @@ class Concatenation {
 				int off = 0;
 				if (offset != null)
 					off = offset;
-				InputStream f = gridFS.readContent((byte[]) id, off, len);
+				InputStream f = storage.readContent((byte[]) id, off, len);
 				if (f == null)
 					throw new IOException(
 							"failed to find base content for concatenation in GridFS: "
@@ -502,8 +502,8 @@ class Concatenation {
 						+ piece);
 	}
 
-	static InputStream getInputStream(V7GridFS gridFS, BSONObject cat)
-			throws IOException {
+	static InputStream getInputStream(GridFSContentStorage storage,
+			BSONObject cat) throws IOException {
 		String store = (String) cat.get("store");
 		if (!"cat".equals(store))
 			throw new IllegalArgumentException("cannot handle non-cat " + store);
@@ -514,7 +514,7 @@ class Concatenation {
 		Vector<InputStream> ins = new Vector<InputStream>(bases.size());
 		try {
 			for (Object piece : bases) {
-				ins.add(getPieceInputStream(gridFS, piece));
+				ins.add(getPieceInputStream(storage, piece));
 			}
 		} finally {
 			if (ins.size() != bases.size())

@@ -55,12 +55,12 @@ class CatCommand {
 				}
 				if (id.length > 20)
 					throw new DecoderException("too long");
-				GridFSDBFile file = fs.findContentByPrefix(id);
+				GridFSDBFile file = fs.storage.findContentByPrefix(id);
 				if (file == null) {
 					System.err.println("file not found");
 					System.exit(1);
 				}
-				IOUtils.copy(fs.readContent(file), System.out);
+				IOUtils.copy(fs.storage.readContent(file), System.out);
 			} catch (DecoderException e) {
 				System.err.println("invalid parameter :" + sha
 						+ " is not a hex-encoded SHA-1 prefix");

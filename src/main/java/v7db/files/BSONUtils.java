@@ -17,10 +17,13 @@
 
 package v7db.files;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
+import org.bson.BSON;
 import org.bson.BSONObject;
 
 /**
@@ -201,5 +204,50 @@ class BSONUtils {
 		}
 		b.put(fieldName, l);
 		return l;
+	}
+
+	/**
+	 * BSON objects are considered equal when their binary encoding matches
+	 */
+	static boolean equals(BSONObject a, BSONObject b) {
+		return a.keySet().equals(b.keySet())
+				&& Arrays.equals(BSON.encode(a), BSON.encode(b));
+	}
+
+	/**
+	 * @return true, if the field contains (in case of an array) or is equal to
+	 *         (in case of a single value) the given BSONObject
+	 */
+	static boolean contains(BSONObject b, String fieldName, BSONObject toLookFor) {
+		Object list = get(b, fieldName);
+		if (list == null)
+			return false;
+		if (list instanceof List<?>) {
+			for (Object o : (List<?>) list) {
+				if (o instanceof BSONObject) {
+					BSONObject x = (BSONObject) o;
+					if (equals(x, toLookFor))
+						return true;
+				}
+			}
+			return false;
+		}
+		if (list instanceof Object[]) {
+			for (Object o : (Object[]) list) {
+				if (o instanceof BSONObject) {
+					BSONObject x = (BSONObject) o;
+					if (equals(x, toLookFor))
+						return true;
+				}
+			}
+			return false;
+		}
+		if (list instanceof BSONObject) {
+			BSONObject x = (BSONObject) list;
+			if (equals(x, toLookFor))
+				return true;
+		}
+		return false;
+
 	}
 }
