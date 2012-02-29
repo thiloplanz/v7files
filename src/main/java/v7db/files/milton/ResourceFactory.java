@@ -73,7 +73,7 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 
 	public void init(ApplicationConfig config, HttpManager manager) {
 		try {
-			endpoint = config.getInitParameter("v7files.endpoint");
+			endpoint = config.getInitParameter("webdav.endpoint");
 
 			endpointName = defaultIfBlank(substringAfterLast(endpoint, "/"),
 					"/");

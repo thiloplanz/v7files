@@ -29,7 +29,7 @@ You can optionally specify a properties file with configuration.
 
 All configuration options can also be set (or overridden) by system properties
 
-    # java -jar v7files.jar serve -Dv7files.endpoints=/webdav -Dhttp.port=5555
+    # java -jar v7files.jar serve -Dwebdav.endpoints=/webdav -Dhttp.port=5555
 
 
 ## Configuration

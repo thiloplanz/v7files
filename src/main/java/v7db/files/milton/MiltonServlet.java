@@ -70,7 +70,7 @@ public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 
 	@Override
 	public void init(ServletConfig config) throws ServletException {
-		String endpoint = config.getInitParameter("v7files.endpoint");
+		String endpoint = config.getInitParameter("webdav.endpoint");
 		Properties ep = Configuration.getEndpointProperties(endpoint);
 		dbName = ep.getProperty("mongo.db");
 		try {

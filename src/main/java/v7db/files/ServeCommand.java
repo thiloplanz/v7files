@@ -35,13 +35,12 @@ class ServeCommand {
 		ServletContextHandler handler = new ServletContextHandler();
 		handler.setContextPath("/");
 
-		String[] endpoints = Configuration
-				.getArrayProperty("v7files.endpoints");
+		String[] endpoints = Configuration.getArrayProperty("webdav.endpoints");
 
 		for (String endpoint : endpoints) {
 
 			ServletHolder servlet = new ServletHolder(new MiltonServlet());
-			servlet.setInitParameter("v7files.endpoint", endpoint);
+			servlet.setInitParameter("webdav.endpoint", endpoint);
 			servlet
 					.setInitParameter(
 							"resource.factory.factory.class",
