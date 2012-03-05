@@ -64,6 +64,7 @@ public class Main {
 		if (configFile != null) {
 			Properties config = new Properties();
 			config.load(new FileInputStream(configFile));
+			Configuration.setSystemProperties(config);
 			Configuration.init(config);
 		} else {
 			Configuration.init(null);
