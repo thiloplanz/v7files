@@ -30,16 +30,14 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
+import org.bson.BSONObject;
 import org.bson.types.ObjectId;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
-import com.mongodb.Mongo;
 import com.mongodb.WriteResult;
-import com.mongodb.gridfs.GridFS;
 
 public class V7GridFS {
 
@@ -51,12 +49,7 @@ public class V7GridFS {
 
 	public V7GridFS(DB db) {
 		files = db.getCollection(bucket);
-		storage = new GridFSContentStorage(new GridFS(db, "v7.fs"));
-	}
-
-	public static V7GridFS getIfExists(Mongo mongo, String dbName) {
-		return mongo.getDB(dbName).collectionExists(bucket) ? new V7GridFS(
-				mongo.getDB(dbName)) : null;
+		storage = new GridFSContentStorage(db);
 	}
 
 	public V7File getFile(String... path) {
@@ -126,29 +119,20 @@ public class V7GridFS {
 	public Object addFile(byte[] data, int offset, int len,
 			Object parentFileId, String filename, String contentType)
 			throws IOException {
-		BasicDBObject metaData = new BasicDBObject("filename", filename)
-				.append("parent", parentFileId).append("_id", new ObjectId());
 
-		if (StringUtils.isNotBlank(contentType))
-			metaData.append("contentType", contentType);
+		ObjectId fileId = new ObjectId();
+		BasicDBObject metaData = new BasicDBObject("parent", parentFileId)
+				.append("_id", fileId);
 
-		if (data != null) {
-			// for up to 55 bytes, storing the complete file inline
-			// takes less space than just storing the SHA-1 and length
-			// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32) + 2*12
-			// (ObjectId back-references)
-			if (len < 55) {
-				metaData.append("in", ArrayUtils.subarray(data, offset, offset
-						+ len));
-			} else {
-				byte[] sha = storage.insertContents(data, offset, len,
-						filename, metaData.get("_id"), contentType);
-				metaData.append("sha", sha).append("length", len);
-			}
-		}
+		// for up to 55 bytes, storing the complete file inline
+		// takes less space than just storing the SHA-1 and length
+		// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32) + 2*12
+		// (ObjectId back-references)
+		metaData.putAll(storage.insertContentsAndBackRefs(data, offset, len,
+				fileId, 55, filename, contentType));
 
 		insertMetaData(metaData);
-		return metaData.get("_id");
+		return fileId;
 	}
 
 	public Object addFile(File data, Object parentFileId, String filename,
@@ -159,17 +143,12 @@ public class V7GridFS {
 			return addFile(smallData, 0, smallData.length, parentFileId,
 					filename, contentType);
 		}
-		BasicDBObject metaData = new BasicDBObject("filename", filename)
-				.append("parent", parentFileId).append("_id", new ObjectId());
+		ObjectId fileId = new ObjectId();
+		BasicDBObject metaData = new BasicDBObject("parent", parentFileId)
+				.append("_id", fileId);
 
-		if (StringUtils.isNotBlank(contentType))
-			metaData.append("contentType", contentType);
-
-		if (data != null) {
-			byte[] sha = storage.insertContents(data, filename, metaData
-					.get("_id"), contentType);
-			metaData.append("sha", sha).append("length", data.length());
-		}
+		metaData.putAll(storage.insertContentsAndBackRefs(data, fileId, 55,
+				filename, contentType));
 
 		insertMetaData(metaData);
 		return metaData.get("_id");
@@ -285,54 +264,57 @@ public class V7GridFS {
 	private void updateContents(DBObject metaData, File contents)
 			throws IOException {
 
-		byte[] oldSha = (byte[]) metaData.get("sha");
+		Object fileId = metaData.get("_id");
+		byte[] oldSha = GridFSContentStorage.getSha(metaData);
+		String filename = (String) metaData.get("filename");
+		String contentType = (String) metaData.get("contentType");
 
-		byte[] sha = storage.insertContents(contents, (String) metaData
-				.get("filename"), metaData.get("_id"), (String) metaData
-				.get("contentType"));
+		BSONObject newContent = storage.insertContentsAndBackRefs(contents,
+				fileId, 55, filename, contentType);
 
-		if (oldSha != null && Arrays.equals(sha, oldSha))
+		// check if it has changed
+		byte[] newSha = GridFSContentStorage.getSha(newContent);
+		if (Arrays.equals(oldSha, newSha))
 			return;
 
-		metaData.put("sha", sha);
-		metaData.put("length", contents.length());
+		metaData.removeField("sha");
+		metaData.removeField("length");
+		metaData.removeField("in");
+
+		metaData.putAll(newContent);
+
 		updateMetaData(metaData);
-		storage.removeRef(oldSha, metaData.get("_id"));
+		storage.removeRef(oldSha, fileId);
 	}
 
 	private void updateContents(DBObject metaData, byte[] contents, int offset,
 			int len) throws IOException {
 
-		byte[] oldSha = (byte[]) metaData.get("sha");
-		// for up to 31 bytes, storing the complete file inline
+		Object fileId = metaData.get("_id");
+		byte[] oldSha = GridFSContentStorage.getSha(metaData);
+		String filename = (String) metaData.get("filename");
+		String contentType = (String) metaData.get("contentType");
+
+		// for up to 55 bytes, storing the complete file inline
 		// takes less space than just storing the SHA-1 and length
-		// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32)
-		if (contents != null && len < 32) {
-			byte[] smallData = ArrayUtils.subarray(contents, offset, offset
-					+ len);
-			byte[] oldSmallData = (byte[]) metaData.get("in");
-			if (oldSmallData != null && Arrays.equals(oldSmallData, smallData))
-				return;
+		// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32) + 2*12
+		// (ObjectId back-references)
+		BSONObject newContent = storage.insertContentsAndBackRefs(contents,
+				offset, len, fileId, 55, filename, contentType);
 
-			metaData.put("in", smallData);
-			metaData.removeField("sha");
-			metaData.removeField("length");
-			updateMetaData(metaData);
-			storage.removeRef(oldSha, metaData.get("_id"));
-			return;
-		}
-
-		byte[] sha = storage.insertContents(contents, offset, len,
-				(String) metaData.get("filename"), metaData.get("_id"),
-				(String) metaData.get("contentType"));
-
-		if (oldSha != null && Arrays.equals(sha, oldSha))
+		// check if it has changed
+		byte[] newSha = GridFSContentStorage.getSha(newContent);
+		if (Arrays.equals(oldSha, newSha))
 			return;
 
-		metaData.put("sha", sha);
-		metaData.put("length", contents.length);
+		metaData.removeField("sha");
+		metaData.removeField("length");
+		metaData.removeField("in");
+
+		metaData.putAll(newContent);
+
 		updateMetaData(metaData);
-		storage.removeRef(oldSha, metaData.get("_id"));
+		storage.removeRef(oldSha, fileId);
 	}
 
 	public V7File getChild(V7File parentFile, String childName) {
@@ -345,7 +327,7 @@ public class V7GridFS {
 
 	void delete(V7File file) throws IOException {
 		// TODO: should check the version present in the db
-		byte[] oldSha = file.getSha();
+		byte[] oldSha = file._getSha();
 		Vermongo.remove(files, file.getId(), new BasicDBObject("deleted_at",
 				new Date()));
 		storage.removeRef(oldSha, file.getId());

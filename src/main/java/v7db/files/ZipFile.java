@@ -48,8 +48,8 @@ public class ZipFile {
 	public static Object addZipFile(V7GridFS fs, File zipFile,
 			Object parentFileId, String filename) throws IOException {
 		// make sure we have the contents first
-		byte[] sha = fs.storage.insertContents(zipFile, filename, null,
-				CONTENT_TYPE);
+		byte[] sha = GridFSContentStorage.getSha(fs.storage.insertContents(
+				zipFile, 0, filename, CONTENT_TYPE));
 
 		try {
 			// open up the zip file

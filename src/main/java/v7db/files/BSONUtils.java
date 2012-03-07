@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSON;
 import org.bson.BSONObject;
@@ -141,6 +142,10 @@ class BSONUtils {
 		return toInteger(getRequired(b, fieldName)).intValue();
 	}
 
+	static long getRequiredLong(BSONObject b, String fieldName) {
+		return toLong(getRequired(b, fieldName)).longValue();
+	}
+
 	static String getString(BSONObject b, String fieldName) {
 		return toString(get(b, fieldName));
 	}
@@ -249,5 +254,16 @@ class BSONUtils {
 		}
 		return false;
 
+	}
+
+	static Object[] values(BSONObject b, String fieldName) {
+		Object x = get(b, fieldName);
+		if (x == null)
+			return ArrayUtils.EMPTY_OBJECT_ARRAY;
+		if (x instanceof List<?>)
+			return ((List<?>) x).toArray();
+		if (x instanceof Object[])
+			return ArrayUtils.clone((Object[]) x);
+		return new Object[] { x };
 	}
 }

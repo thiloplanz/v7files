@@ -17,6 +17,9 @@
 
 package v7db.files;
 
+import static v7db.files.GridFSContentStorage.getInlineData;
+import static v7db.files.GridFSContentStorage.getSha;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -26,12 +29,7 @@ import java.io.OutputStream;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.Inflater;
-import java.util.zip.InflaterInputStream;
 
-import org.apache.commons.codec.binary.Hex;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -78,7 +76,7 @@ public class V7File {
 
 	private void loadGridFile() {
 		if (gridFile == null)
-			gridFile = storage.findContent(getSha());
+			gridFile = storage.findContent(getSha(metaData));
 	}
 
 	public String getContentType() {
@@ -127,10 +125,6 @@ public class V7File {
 		return null;
 	}
 
-	private byte[] getInlineData() {
-		return (byte[]) metaData.get("in");
-	}
-
 	/**
 	 * useful to send gzipped contents directly to a client that supports it,
 	 * without having to uncompress it first.
@@ -141,10 +135,10 @@ public class V7File {
 	 */
 
 	public InputStream getInputStreamWithGzipContents() throws IOException {
-		byte[] inline = getInlineData();
+		byte[] inline = getInlineData(metaData);
 		if (inline != null)
 			return null;
-		if (getSha() == null)
+		if (getSha(metaData) == null)
 			return null;
 		loadGridFile();
 		String store = (String) gridFile.get("store");
@@ -158,10 +152,10 @@ public class V7File {
 	 * @return null, if the file is not stored using gzip
 	 */
 	public Long getGZipLength() {
-		byte[] inline = getInlineData();
+		byte[] inline = getInlineData(metaData);
 		if (inline != null)
 			return null;
-		if (getSha() == null)
+		if (getSha(metaData) == null)
 			return null;
 		loadGridFile();
 		String store = (String) gridFile.get("store");
@@ -177,31 +171,19 @@ public class V7File {
 	 * @throws IOException
 	 */
 	public InputStream getInputStream() throws IOException {
-		byte[] inline = getInlineData();
+		byte[] inline = getInlineData(metaData);
 		if (inline != null)
 			return new ByteArrayInputStream(inline);
-		if (getSha() == null)
+		if (getSha(metaData) == null)
 			return null;
 		loadGridFile();
-		String store = (String) gridFile.get("store");
-		if (store == null || "raw".equals(store))
-			return gridFile.getInputStream();
-		if ("z".equals(store))
-			return new InflaterInputStream(gridFile.getInputStream(),
-					new Inflater(true));
-		if ("zin".equals(store))
-			return new InflaterInputStream(new ByteArrayInputStream(
-					(byte[]) gridFile.get("in")), new Inflater(true));
-		if ("in".equals(store))
-			return new ByteArrayInputStream((byte[]) gridFile.get("in"));
-		if ("gz".equals(store))
-			return new GZIPInputStream(gridFile.getInputStream());
-		if ("alt".equals(store))
-			return OutOfBand.getInputStream(storage, gridFile);
-		if ("zip".equals(store))
-			return Compression.unzip(gridFile.getInputStream());
-		throw new IOException("unsupported storage scheme '" + store
-				+ "' on file " + getName());
+
+		try {
+			return storage.getInputStream(gridFile);
+		} catch (IllegalArgumentException e) {
+			throw new IOException(e.getMessage() + " on file " + getName());
+		}
+
 	}
 
 	InputStream getInputStream(Integer _off, Integer _len) throws IOException {
@@ -230,20 +212,12 @@ public class V7File {
 		return new ByteArrayInputStream(data);
 	}
 
-	byte[] getSha() {
-		byte[] sha = (byte[]) metaData.get("sha");
-		if (sha != null)
-			return sha;
-		byte[] data = getInlineData();
-		if (data != null) {
-			sha = DigestUtils.sha(data);
-			return sha;
-		}
-		return null;
+	byte[] _getSha() {
+		return getSha(metaData);
 	}
 
 	public boolean hasContent() {
-		return getInlineData() != null || getSha() != null;
+		return getInlineData(metaData) != null || getSha(metaData) != null;
 	}
 
 	public Long getLength() {
@@ -252,17 +226,14 @@ public class V7File {
 			return (Long) l;
 		if (l instanceof Number)
 			return ((Number) l).longValue();
-		byte[] data = getInlineData();
+		byte[] data = getInlineData(metaData);
 		if (data != null)
 			return Long.valueOf(data.length);
 		return null;
 	}
 
 	public String getDigest() {
-		byte[] sha = getSha();
-		if (sha == null)
-			return null;
-		return Hex.encodeHexString(sha);
+		return GridFSContentStorage.getDigest(metaData);
 	}
 
 	public List<V7File> getChildren() {

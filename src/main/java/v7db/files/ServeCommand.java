@@ -23,6 +23,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
+import v7db.files.formpost.FormPostServlet;
 import v7db.files.milton.MiltonServlet;
 
 class ServeCommand {
@@ -32,24 +33,47 @@ class ServeCommand {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
+
+		Configuration.checkEndpoints();
+
 		ServletContextHandler handler = new ServletContextHandler();
 		handler.setContextPath("/");
 
-		String[] endpoints = Configuration.getArrayProperty("webdav.endpoints");
+		// WebDAV
+		{
+			String[] endpoints = Configuration
+					.getArrayProperty("webdav.endpoints");
 
-		for (String endpoint : endpoints) {
+			for (String endpoint : endpoints) {
 
-			ServletHolder servlet = new ServletHolder(new MiltonServlet());
-			servlet.setInitParameter("webdav.endpoint", endpoint);
-			servlet
-					.setInitParameter(
-							"resource.factory.factory.class",
-							Configuration
-									.getProperty("resource.factory.factory.class"));
+				ServletHolder servlet = new ServletHolder(new MiltonServlet());
+				servlet.setInitParameter("webdav.endpoint", endpoint);
+				servlet.setInitParameter("resource.factory.factory.class",
+						Configuration
+								.getProperty("resource.factory.factory.class"));
 
-			handler.addServlet(servlet, endpoint.equals("/") ? "/*"
-					: (endpoint + "/*"));
+				handler.addServlet(servlet, endpoint.equals("/") ? "/*"
+						: (endpoint + "/*"));
+			}
+
 		}
+
+		// FormPost
+
+		{
+			String[] endpoints = Configuration
+					.getArrayProperty("formpost.endpoints");
+
+			for (String endpoint : endpoints) {
+
+				ServletHolder servlet = new ServletHolder(new FormPostServlet(
+						Configuration.getEndpointProperties(endpoint)));
+				handler.addServlet(servlet, endpoint.equals("/") ? "/*"
+						: (endpoint + "/*"));
+			}
+
+		}
+
 		int port = Integer.parseInt(Configuration.getProperty("http.port"));
 		final Server server = new Server(port);
 		server.setHandler(handler);

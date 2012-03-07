@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import v7db.files.Configuration;
-import v7db.files.V7GridFS;
+import v7db.files.Tenants;
 
 import com.bradmcevoy.http.ApplicationConfig;
 import com.bradmcevoy.http.HttpManager;
@@ -65,15 +65,14 @@ public class PathMultiTenantResourceFactory implements
 		String realPath = "/"
 				+ substringAfter(p, servletPath + "/" + tenant + "/");
 
-		final String tenantDbName = tenant;
-
 		ResourceFactory t = paths.get(tenant);
 		if (t != null)
 			return t.getResource(host, realPath);
 
 		// check if the tenant exists
-		V7GridFS fs = V7GridFS.getIfExists(mongo, tenant);
-		if (fs == null) {
+		final String tenantDbName = Tenants
+				.getTenantDbName(mongo, null, tenant);
+		if (tenantDbName == null) {
 			log.warn("tried to access non-existing tenant " + tenant + " for "
 					+ realPath);
 			return null;

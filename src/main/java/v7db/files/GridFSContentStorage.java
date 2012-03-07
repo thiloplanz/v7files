@@ -24,6 +24,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -31,15 +34,17 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
+import org.bson.BasicBSONObject;
 
 import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
 import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 import com.mongodb.gridfs.GridFSInputFile;
 
-class GridFSContentStorage {
+public class GridFSContentStorage {
 
 	/**
 	 * very small files are inlined (no chunks) we have no performance data yet
@@ -55,8 +60,8 @@ class GridFSContentStorage {
 
 	private final DBCollection metaCollection;
 
-	GridFSContentStorage(GridFS fs) {
-		this.fs = fs;
+	public GridFSContentStorage(DB db) {
+		this.fs = new GridFS(db, "v7.fs");
 		this.metaCollection = fs.getDB().getCollectionFromString(
 				fs.getBucketName() + ".files");
 	}
@@ -207,8 +212,9 @@ class GridFSContentStorage {
 		}
 	}
 
-	byte[] insertContents(byte[] data, int offset, int len, String filename,
-			Object fileId, String contentType) throws IOException {
+	private byte[] insertContents(byte[] data, int offset, int len,
+			String filename, Object fileId, String contentType)
+			throws IOException {
 		byte[] sha = DigestUtils
 				.sha(new ByteArrayInputStream(data, offset, len));
 
@@ -262,7 +268,7 @@ class GridFSContentStorage {
 		return sha;
 	}
 
-	byte[] insertContents(File data, String filename, Object fileId,
+	private byte[] insertContents(File data, String filename, Object fileId,
 			String contentType) throws IOException {
 
 		// avoid temporary files for small data
@@ -300,7 +306,7 @@ class GridFSContentStorage {
 		return sha;
 	}
 
-	byte[] insertContents(byte[] data, String filename, Object fileId,
+	private byte[] insertContents(byte[] data, String filename, Object fileId,
 			String contentType) throws IOException {
 		return insertContents(data, 0, data.length, filename, fileId,
 				contentType);
@@ -338,4 +344,169 @@ class GridFSContentStorage {
 			newFile.put("refHistory", newFile.get("refs"));
 		}
 	}
+
+	static byte[] getSha(BSONObject metaData) {
+		byte[] sha = (byte[]) metaData.get("sha");
+		if (sha != null)
+			return sha;
+		byte[] data = getInlineData(metaData);
+		if (data != null) {
+			return DigestUtils.sha(data);
+		}
+		return null;
+	}
+
+	static String getDigest(BSONObject metaData) {
+		byte[] sha = getSha(metaData);
+		if (sha == null)
+			return null;
+		return Hex.encodeHexString(sha);
+	}
+
+	static byte[] getInlineData(BSONObject metaData) {
+		return (byte[]) metaData.get("in");
+	}
+
+	static long getLength(BSONObject metaData) {
+		byte[] inline = getInlineData(metaData);
+		if (inline != null)
+			return inline.length;
+		return BSONUtils.getRequiredLong(metaData, "length");
+	}
+
+	static String getFilename(BSONObject metaData) {
+		return BSONUtils.getString(metaData, "filename");
+	}
+
+	public InputStream getInputStream(BSONObject file) throws IOException {
+		byte[] inline = getInlineData(file);
+		if (inline != null)
+			return new ByteArrayInputStream(inline);
+		byte[] sha = (byte[]) file.get("sha");
+		if (sha == null)
+			return null;
+
+		GridFSDBFile gridFile = findContent(sha);
+		try {
+			return getInputStream(gridFile);
+		} catch (IllegalArgumentException e) {
+			Object name = file.get("filename");
+			if (!(name instanceof String))
+				name = Hex.encodeHexString(sha);
+			throw new IOException(e.getMessage() + " on file " + name);
+		}
+	}
+
+	public InputStream getInputStream(GridFSDBFile gridFile)
+			throws IOException, IllegalArgumentException {
+		String store = (String) gridFile.get("store");
+		if (store == null || "raw".equals(store))
+			return gridFile.getInputStream();
+		if ("z".equals(store))
+			return new InflaterInputStream(gridFile.getInputStream(),
+					new Inflater(true));
+		if ("zin".equals(store))
+			return new InflaterInputStream(new ByteArrayInputStream(
+					(byte[]) gridFile.get("in")), new Inflater(true));
+		if ("in".equals(store))
+			return new ByteArrayInputStream((byte[]) gridFile.get("in"));
+		if ("gz".equals(store))
+			return new GZIPInputStream(gridFile.getInputStream());
+		if ("alt".equals(store))
+			return OutOfBand.getInputStream(this, gridFile);
+		if ("zip".equals(store))
+			return Compression.unzip(gridFile.getInputStream());
+		throw new IllegalArgumentException("unsupported storage scheme '"
+				+ store + "'");
+	}
+
+	/**
+	 * inserts the contents, and returns metadata describing it (with either
+	 * "sha" and "length" fields or inline data "in"). Does not save the
+	 * metadata, or make back references.
+	 * 
+	 */
+
+	public BSONObject insertContents(byte[] data, int inlineUntil,
+			String filename, String contentType) throws IOException {
+		return insertContentsAndBackRefs(data, null, inlineUntil, filename,
+				contentType);
+	}
+
+	public BSONObject insertContents(byte[] data, int offset, int len,
+			int inlineUntil, String filename, String contentType)
+			throws IOException {
+		return insertContentsAndBackRefs(data, offset, len, null, inlineUntil,
+				filename, contentType);
+	}
+
+	public BSONObject insertContents(File data, int inlineUntil,
+			String filename, String contentType) throws IOException {
+		return insertContentsAndBackRefs(data, null, inlineUntil, filename,
+				contentType);
+	}
+
+	BSONObject insertContentsAndBackRefs(byte[] data, Object fileId,
+			int inlineUntil, String filename, String contentType)
+			throws IOException {
+		if (data != null)
+			return insertContentsAndBackRefs(data, 0, data.length, fileId,
+					inlineUntil, filename, contentType);
+		return insertContentsAndBackRefs(null, 0, 0, fileId, inlineUntil,
+				filename, contentType);
+	}
+
+	BSONObject insertContentsAndBackRefs(byte[] data, int offset, int len,
+			Object fileId, int inlineUntil, String filename, String contentType)
+			throws IOException {
+		BasicBSONObject metaData = new BasicBSONObject();
+
+		if (StringUtils.isNotBlank(filename))
+			metaData.append("filename", filename);
+
+		if (StringUtils.isNotBlank(contentType))
+			metaData.append("contentType", contentType);
+
+		if (data != null) {
+			if (len <= inlineUntil) {
+				metaData.append("in", ArrayUtils.subarray(data, offset, offset
+						+ len));
+			} else {
+				byte[] sha = insertContents(data, offset, len, filename,
+						fileId, contentType);
+				metaData.append("sha", sha).append("length", len);
+			}
+		}
+
+		return metaData;
+	}
+
+	BSONObject insertContentsAndBackRefs(File data, Object fileId,
+			int inlineUntil, String filename, String contentType)
+			throws IOException {
+		if (data == null)
+			return insertContentsAndBackRefs(null, 0, 0, fileId, inlineUntil,
+					filename, contentType);
+		long len = data.length();
+		if (data.length() <= inlineUntil)
+			return insertContentsAndBackRefs(FileUtils
+					.readFileToByteArray(data), fileId, inlineUntil, filename,
+					contentType);
+
+		BasicBSONObject metaData = new BasicBSONObject();
+
+		if (StringUtils.isNotBlank(filename))
+			metaData.append("filename", filename);
+
+		if (StringUtils.isNotBlank(contentType))
+			metaData.append("contentType", contentType);
+
+		byte[] sha = insertContents(data, filename, fileId, contentType);
+		metaData.append("sha", sha);
+		BSONUtils.putIntegerOrLong(metaData, "length", len);
+
+		return metaData;
+
+	}
+
 }

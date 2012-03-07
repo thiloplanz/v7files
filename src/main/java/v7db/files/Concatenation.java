@@ -139,8 +139,9 @@ class Concatenation {
 		DBObject cat = calculateConcatenation(storage, pieces);
 		// edge-case: became inline data only
 		if (cat.containsField("in")) {
-			return storage.insertContents((byte[]) cat.get("in"), filename,
-					fileId, contentType);
+			return GridFSContentStorage.getSha(storage
+					.insertContentsAndBackRefs((byte[]) cat.get("in"), fileId,
+							0, filename, contentType));
 		}
 
 		byte[] sha = (byte[]) cat.get("_id");

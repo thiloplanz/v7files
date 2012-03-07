@@ -15,40 +15,44 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files.milton;
+package v7db.files;
 
 import java.util.Properties;
 
-import v7db.files.Tenants;
+import org.apache.commons.lang3.StringUtils;
 
-import com.bradmcevoy.http.AuthenticationService;
-import com.bradmcevoy.http.ResourceFactory;
-import com.bradmcevoy.http.webdav.DefaultWebDavResponseHandler;
-import com.bradmcevoy.http.webdav.WebDavResponseHandler;
+import com.mongodb.Mongo;
 
-public class ResourceFactoryFactory implements
-		com.bradmcevoy.http.ResourceFactoryFactory {
+public class Tenants {
 
-	public ResourceFactory createResourceFactory() {
-		Properties props = MiltonServlet.endpointProperties.get();
+	/**
+	 * 
+	 * @return null, if the mapped database does not yet exist
+	 */
+	public static String getTenantDbName(Mongo mongo, Properties props,
+			String tenantName) {
+		if (props != null && "single".equals(getTenancyMode(props))) {
+			return props.getProperty("mongo.db");
+		}
 
-		String mode = Tenants.getTenancyMode(props);
+		// TODO: some kind of mapping
+		final String tenantDbName = tenantName;
+		if (StringUtils.isBlank(tenantDbName))
+			return null;
+		if (mongo.getDB(tenantDbName).collectionExists("v7files"))
+			return tenantDbName;
+		return null;
+	}
+
+	public static String getTenancyMode(Properties props) {
+		String mode = props.getProperty("v7files.tenants");
 		if ("single".equals(mode))
-			return new v7db.files.milton.ResourceFactory(props
-					.getProperty("mongo.db"));
+			return mode;
 
 		if ("path".equals(mode))
-			return new PathMultiTenantResourceFactory();
+			return mode;
 
 		throw new IllegalArgumentException("unsupported tenancy mode: " + mode);
-
-	}
-
-	public WebDavResponseHandler createResponseHandler() {
-		return new DefaultWebDavResponseHandler(new AuthenticationService());
-	}
-
-	public void init() {
 	}
 
 }
