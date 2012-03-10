@@ -18,6 +18,7 @@
 package v7db.files.formpost;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -35,10 +36,13 @@ import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
 import org.bson.BasicBSONObject;
 import org.bson.types.ObjectId;
 
+import v7db.files.BSONUtils;
 import v7db.files.GridFSContentStorage;
 
 import com.mongodb.BasicDBObject;
@@ -138,4 +142,110 @@ public class FormPostServlet extends HttpServlet {
 		controlCollection.update(new BasicDBObject("_id", _id),
 				new BasicDBObject("$push", new BasicDBObject("data", result)));
 	}
+
+	@Override
+	protected void doGet(HttpServletRequest request,
+			HttpServletResponse response) throws ServletException, IOException {
+
+		// In the simplest case, every element is an ObjectId (data._id) for one
+		// the uploads.
+		// This allows a direct download using a GET request to the URL
+		// <endpoint>/<_id>/<data._id>/<fieldName>/<index>.
+
+		String[] split = StringUtils.split(request.getPathInfo(), '/');
+		if (split.length < 1) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND,
+					"Control document id not specified");
+			return;
+		}
+		if (split.length < 2) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND,
+					"Upload id not specified");
+			return;
+		}
+		String _id = split[0];
+		String upload_id = split[1];
+		String fileFieldName = "file";
+		ObjectId _u;
+		try {
+			_u = new ObjectId(upload_id);
+		} catch (Exception e) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND,
+					"Control document '" + _id + "' with invalid upload id '"
+							+ upload_id + "' not found");
+			return;
+		}
+		BSONObject control = controlCollection.findOne(new BasicDBObject("_id",
+				_id).append("data._id", _u));
+		if (control == null) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND,
+					"Control document '" + _id + "' with upload id '"
+							+ upload_id + "' not found");
+			return;
+		}
+
+		BSONObject file = null;
+		for (Object f : BSONUtils.values(control, "data")) {
+			if (f instanceof BSONObject) {
+				BSONObject bf = (BSONObject) f;
+				if (_u.equals(bf.get("_id"))) {
+					f = BSONUtils.getObject(bf, "files." + fileFieldName);
+					if (f instanceof BSONObject) {
+						file = (BSONObject) f;
+						break;
+					}
+				}
+			}
+		}
+		if (file == null) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND,
+					"Control document '" + _id + "' does not have upload id '"
+							+ upload_id + "'");
+			return;
+		}
+
+		for (Object download : BSONUtils.values(control, "downloads")) {
+			// a hex-encoded String is also allowed for ease of integration
+			if (download instanceof String) {
+				try {
+					download = new ObjectId((String) download);
+				} catch (Exception e) {
+					continue;
+				}
+			}
+			if (download instanceof ObjectId) {
+				if (download.equals(_u)) {
+					sendFile(request, response, file);
+					return;
+				}
+				continue;
+			}
+		}
+
+		response.sendError(HttpServletResponse.SC_FORBIDDEN);
+		return;
+
+	}
+
+	private void sendFile(HttpServletRequest request,
+			HttpServletResponse response, BSONObject file) throws IOException {
+		String contentType = GridFSContentStorage.getContentType(file);
+		String name = GridFSContentStorage.getFilename(file);
+		Long length = GridFSContentStorage.getLength(file);
+		response.setHeader("Content-type", StringUtils.defaultString(
+				contentType, "application/octet-stream"));
+		if (StringUtils.isNotBlank(name))
+			response.setHeader("Content-disposition", "attachment; filename=\""
+					+ name + "\"");
+		if (length != null)
+			response.setContentLength(length.intValue());
+
+		InputStream in = storage.getInputStream(file);
+		try {
+			IOUtils.copy(in, response.getOutputStream());
+		} finally {
+			in.close();
+		}
+	}
+
 }

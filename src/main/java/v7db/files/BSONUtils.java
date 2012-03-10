@@ -38,7 +38,7 @@ import org.bson.BSONObject;
  * 
  */
 
-class BSONUtils {
+public class BSONUtils {
 
 	private static <T> T notNull(T x) {
 		if (x == null)
@@ -150,6 +150,16 @@ class BSONUtils {
 		return toString(get(b, fieldName));
 	}
 
+	public static BSONObject getObject(BSONObject b, String fieldName) {
+		Object x = get(b, fieldName);
+		if (x == null)
+			return null;
+		if (x instanceof BSONObject)
+			return (BSONObject) x;
+		throw new IllegalArgumentException("cannot convert `" + x
+				+ "` into a BSONObject");
+	}
+
 	static Object removeField(BSONObject b, String fieldName) {
 		if (fieldName.contains("."))
 			throw new UnsupportedOperationException("not yet implemented");
@@ -256,7 +266,7 @@ class BSONUtils {
 
 	}
 
-	static Object[] values(BSONObject b, String fieldName) {
+	public static Object[] values(BSONObject b, String fieldName) {
 		Object x = get(b, fieldName);
 		if (x == null)
 			return ArrayUtils.EMPTY_OBJECT_ARRAY;

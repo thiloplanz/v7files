@@ -367,15 +367,19 @@ public class GridFSContentStorage {
 		return (byte[]) metaData.get("in");
 	}
 
-	static long getLength(BSONObject metaData) {
+	public static long getLength(BSONObject metaData) {
 		byte[] inline = getInlineData(metaData);
 		if (inline != null)
 			return inline.length;
 		return BSONUtils.getRequiredLong(metaData, "length");
 	}
 
-	static String getFilename(BSONObject metaData) {
+	public static String getFilename(BSONObject metaData) {
 		return BSONUtils.getString(metaData, "filename");
+	}
+
+	public static String getContentType(BSONObject metaData) {
+		return BSONUtils.getString(metaData, "contentType");
 	}
 
 	public InputStream getInputStream(BSONObject file) throws IOException {
@@ -397,8 +401,8 @@ public class GridFSContentStorage {
 		}
 	}
 
-	public InputStream getInputStream(GridFSDBFile gridFile)
-			throws IOException, IllegalArgumentException {
+	InputStream getInputStream(GridFSDBFile gridFile) throws IOException,
+			IllegalArgumentException {
 		String store = (String) gridFile.get("store");
 		if (store == null || "raw".equals(store))
 			return gridFile.getInputStream();

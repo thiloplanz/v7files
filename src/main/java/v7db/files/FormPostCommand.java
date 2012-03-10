@@ -19,7 +19,9 @@ package v7db.files;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
@@ -56,6 +58,39 @@ class FormPostCommand {
 		WriteResult r = cc.insert(doc);
 		if (r.getError() != null)
 			throw new IOException(r.getError());
+	}
+
+	private static void allow(String[] args) throws MongoException, IOException {
+		if ("download".equals(args[2])) {
+			FormPostConfiguration conf = getFormPostConfiguration(args[3]);
+			DBCollection cc = conf.getControlCollection();
+			BSONObject controlDoc = cc.findOne(args[4]);
+			if (controlDoc == null) {
+				System.err.println("FormPost control document `" + args[4]
+						+ "` not found.");
+				return;
+			}
+			Object[] uploads = BSONUtils.values(controlDoc, "data");
+			List<Object> allows = new ArrayList<Object>();
+			for (Object a : BSONUtils.values(controlDoc, "downloads")) {
+				allows.add(a);
+			}
+			for (Object upload : uploads) {
+				BSONObject u = (BSONObject) upload;
+				Object id = u.get("_id");
+				if (!allows.contains(id))
+					allows.add(id);
+			}
+			WriteResult r = cc.update(new BasicDBObject("_id", controlDoc
+					.get("_id")), new BasicDBObject("$set", new BasicDBObject(
+					"downloads", allows)));
+			if (r.getError() != null)
+				throw new IOException(r.getError());
+		} else {
+			throw new IllegalArgumentException("undefined acl command `allow "
+					+ args[2] + "`, valid choices are `download`");
+
+		}
 	}
 
 	private static void ls(String[] args) throws UnknownHostException,
@@ -101,11 +136,12 @@ class FormPostCommand {
 
 	public static void main(String[] args) throws MongoException, IOException {
 
-		if (args.length != 4) {
+		if (args.length != 4 && args.length != 5) {
 			System.err
 					.println("Manage the control documents for the FormPost server:");
 			System.err.println("  formPost create <endpoint> <id>");
 			System.err.println("  formPost ls <endpoint> <id>");
+			System.err.println("  formPost allow download <endpoint> <id>");
 			System.exit(1);
 		}
 
@@ -120,8 +156,13 @@ class FormPostCommand {
 			return;
 		}
 
+		if ("allow".equals(command)) {
+			allow(args);
+			return;
+		}
+
 		System.err.println("Unsupported command '" + command + "'.");
-		System.err.println("Valid commands are 'create' and 'ls'");
+		System.err.println("Valid commands are 'create', 'ls', and 'allow'");
 		System.exit(1);
 
 	}
