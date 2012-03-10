@@ -119,16 +119,17 @@ public class FormPostServlet extends HttpServlet {
 		}
 
 		BSONObject result = new BasicBSONObject("_id", uploadId);
-		List<BSONObject> uploads = new ArrayList<BSONObject>();
+		BSONObject uploads = new BasicBSONObject();
 		for (FileItem file : files) {
 			DiskFileItem f = (DiskFileItem) file;
 			// inline until 10KB
 			if (f.isInMemory()) {
-				uploads.add(storage.insertContents(f.get(), 10240, f.getName(),
-						f.getContentType()));
+				uploads.put(f.getFieldName(), storage.insertContents(f.get(),
+						10240, f.getName(), f.getContentType()));
 			} else {
-				uploads.add(storage.insertContents(f.getStoreLocation(), 10240,
-						f.getName(), f.getContentType()));
+				uploads.put(f.getFieldName(), storage.insertContents(f
+						.getStoreLocation(), 10240, f.getName(), f
+						.getContentType()));
 			}
 			file.delete();
 		}

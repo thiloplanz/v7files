@@ -82,13 +82,19 @@ class FormPostCommand {
 			Object params = u.get("parameters");
 			if (params != null)
 				System.out.println("     " + params);
-			for (Object file : BSONUtils.values(u, "files")) {
-				BSONObject f = (BSONObject) file;
-				System.out.format("      %10d %80s %10s\n",
-						GridFSContentStorage.getLength(f), GridFSContentStorage
-								.getFilename(f), GridFSContentStorage
-								.getDigest(f).substring(0, 10));
-			}
+			BSONObject files = (BSONObject) u.get("files");
+			if (files != null)
+				for (String fileField : files.keySet()) {
+					for (Object file : BSONUtils
+							.values(u, "files." + fileField)) {
+						BSONObject f = (BSONObject) file;
+						System.out.format("      %20s %10d %80s %10s\n",
+								fileField, GridFSContentStorage.getLength(f),
+								GridFSContentStorage.getFilename(f),
+								GridFSContentStorage.getDigest(f).substring(0,
+										10));
+					}
+				}
 			System.out.println("   ----");
 		}
 	}
