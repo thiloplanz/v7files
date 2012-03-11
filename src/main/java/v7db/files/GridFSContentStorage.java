@@ -345,7 +345,7 @@ public class GridFSContentStorage {
 		}
 	}
 
-	static byte[] getSha(BSONObject metaData) {
+	public static byte[] getSha(BSONObject metaData) {
 		byte[] sha = (byte[]) metaData.get("sha");
 		if (sha != null)
 			return sha;
@@ -367,11 +367,11 @@ public class GridFSContentStorage {
 		return (byte[]) metaData.get("in");
 	}
 
-	public static long getLength(BSONObject metaData) {
+	public static Long getLength(BSONObject metaData) {
 		byte[] inline = getInlineData(metaData);
 		if (inline != null)
-			return inline.length;
-		return BSONUtils.getRequiredLong(metaData, "length");
+			return Long.valueOf(inline.length);
+		return BSONUtils.getLong(metaData, "length");
 	}
 
 	public static String getFilename(BSONObject metaData) {

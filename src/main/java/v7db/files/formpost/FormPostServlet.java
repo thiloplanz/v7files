@@ -20,6 +20,7 @@ package v7db.files.formpost;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.Map.Entry;
@@ -30,6 +31,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
 import org.apache.commons.fileupload.FileUploadException;
@@ -38,6 +40,7 @@ import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.BSON;
 import org.bson.BSONObject;
 import org.bson.BasicBSONObject;
 import org.bson.types.ObjectId;
@@ -139,8 +142,24 @@ public class FormPostServlet extends HttpServlet {
 		}
 		result.put("files", uploads);
 		result.put("parameters", parameters);
-		controlCollection.update(new BasicDBObject("_id", _id),
-				new BasicDBObject("$push", new BasicDBObject("data", result)));
+
+		String redirect = BSONUtils.getString(control, "redirect");
+		// redirect mode
+		if (StringUtils.isNotBlank(redirect)) {
+			controlCollection.update(new BasicDBObject("_id", _id),
+					new BasicDBObject("$push",
+							new BasicDBObject("data", result)));
+
+			response.sendRedirect(redirect + "?v7_formpost_id=" + uploadId);
+			return;
+		}
+		// echo mode
+
+		// JSON does not work, see https://jira.mongodb.org/browse/JAVA-332
+		// response.setContentType("application/json");
+		// response.getWriter().write(JSON.serialize(result));
+		byte[] bson = BSON.encode(result);
+		response.getOutputStream().write(bson);
 	}
 
 	@Override
@@ -158,42 +177,72 @@ public class FormPostServlet extends HttpServlet {
 					"Control document id not specified");
 			return;
 		}
-		if (split.length < 2) {
+
+		byte[] sha = null;
+		// sha parameter
+		if (StringUtils.isNotBlank(request.getParameter("sha"))) {
+			String s = request.getParameter("sha");
+			try {
+				sha = Hex.decodeHex(s.toCharArray());
+			} catch (Exception e) {
+				response.sendError(HttpServletResponse.SC_NOT_FOUND,
+						"Invalid content digest '" + s + "'");
+				return;
+			}
+		}
+
+		if (split.length < 2 && sha == null) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND,
 					"Upload id not specified");
 			return;
 		}
 		String _id = split[0];
-		String upload_id = split[1];
+		String upload_id = split.length > 1 ? split[1] : null;
 		String fileFieldName = "file";
-		ObjectId _u;
-		try {
-			_u = new ObjectId(upload_id);
-		} catch (Exception e) {
-			response.sendError(HttpServletResponse.SC_NOT_FOUND,
-					"Control document '" + _id + "' with invalid upload id '"
-							+ upload_id + "' not found");
-			return;
-		}
+		ObjectId _u = null;
+		if (upload_id != null)
+			try {
+				_u = new ObjectId(upload_id);
+			} catch (Exception e) {
+				response.sendError(HttpServletResponse.SC_NOT_FOUND,
+						"Invalid upload id '" + upload_id + "'");
+				return;
+			}
 		BSONObject control = controlCollection.findOne(new BasicDBObject("_id",
-				_id).append("data._id", _u));
+				_id));
 		if (control == null) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND,
-					"Control document '" + _id + "' with upload id '"
-							+ upload_id + "' not found");
+					"Control document '" + _id + "' not found");
 			return;
 		}
 
 		BSONObject file = null;
-		for (Object f : BSONUtils.values(control, "data")) {
-			if (f instanceof BSONObject) {
-				BSONObject bf = (BSONObject) f;
-				if (_u.equals(bf.get("_id"))) {
-					f = BSONUtils.getObject(bf, "files." + fileFieldName);
-					if (f instanceof BSONObject) {
-						file = (BSONObject) f;
-						break;
+
+		if (_u != null)
+			for (Object f : BSONUtils.values(control, "data")) {
+				if (f instanceof BSONObject) {
+					BSONObject bf = (BSONObject) f;
+					if (_u.equals(bf.get("_id"))) {
+						f = BSONUtils.getObject(bf, "files." + fileFieldName);
+						if (f instanceof BSONObject) {
+							file = (BSONObject) f;
+							break;
+						}
 					}
+				}
+			}
+
+		if (sha != null) {
+			if (file != null) {
+				byte[] realSha = GridFSContentStorage.getSha(file);
+				if (!Arrays.equals(sha, realSha)) {
+					response.sendError(HttpServletResponse.SC_NOT_FOUND,
+							"Content digest mismatch");
+					return;
+				}
+			} else {
+				if (storage.contentAlreadyExists(sha)) {
+					file = new BasicBSONObject("sha", sha);
 				}
 			}
 		}
@@ -203,12 +252,20 @@ public class FormPostServlet extends HttpServlet {
 							+ upload_id + "'");
 			return;
 		}
+		String customFilename = request.getParameter("filename");
+		if (StringUtils.isNotBlank(customFilename))
+			file.put("filename", customFilename);
 
 		for (Object download : BSONUtils.values(control, "downloads")) {
 			// a hex-encoded String is also allowed for ease of integration
 			if (download instanceof String) {
 				try {
-					download = new ObjectId((String) download);
+					byte[] b = Hex.decodeHex(((String) download).toCharArray());
+					// SHA-1 or ObjectId ?
+					if (b.length == 20) {
+						download = b;
+					} else
+						download = new ObjectId((String) download);
 				} catch (Exception e) {
 					continue;
 				}
@@ -219,6 +276,21 @@ public class FormPostServlet extends HttpServlet {
 					return;
 				}
 				continue;
+			}
+			// SHA-1
+			if (download instanceof byte[]) {
+				if (download.equals(sha)) {
+					sendFile(request, response, file);
+					return;
+				}
+				continue;
+			}
+			if (download instanceof BSONObject) {
+				BSONObject b = (BSONObject) download;
+				if (BSONUtils.isTrue(b, "anySha")) {
+					sendFile(request, response, file);
+					return;
+				}
 			}
 		}
 

@@ -26,6 +26,7 @@ import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
+import org.bson.BasicBSONObject;
 import org.bson.types.ObjectId;
 
 import v7db.files.formpost.FormPostConfiguration;
@@ -70,22 +71,32 @@ class FormPostCommand {
 						+ "` not found.");
 				return;
 			}
-			Object[] uploads = BSONUtils.values(controlDoc, "data");
 			List<Object> allows = new ArrayList<Object>();
 			for (Object a : BSONUtils.values(controlDoc, "downloads")) {
 				allows.add(a);
 			}
-			for (Object upload : uploads) {
-				BSONObject u = (BSONObject) upload;
-				Object id = u.get("_id");
-				if (!allows.contains(id))
-					allows.add(id);
+
+			String type = args[5];
+			if ("all".equals(type)) {
+				Object[] uploads = BSONUtils.values(controlDoc, "data");
+				for (Object upload : uploads) {
+					BSONObject u = (BSONObject) upload;
+					Object id = u.get("_id");
+					if (!allows.contains(id))
+						allows.add(id);
+				}
+			} else if ("anySha".equals(type)) {
+				allows.add(new BasicBSONObject("anySha", true));
+			} else {
+				throw new IllegalArgumentException("undefined `allow` type `"
+						+ type + "`, valid choices are `all`, `anySha`");
 			}
 			WriteResult r = cc.update(new BasicDBObject("_id", controlDoc
 					.get("_id")), new BasicDBObject("$set", new BasicDBObject(
 					"downloads", allows)));
 			if (r.getError() != null)
 				throw new IOException(r.getError());
+
 		} else {
 			throw new IllegalArgumentException("undefined acl command `allow "
 					+ args[2] + "`, valid choices are `download`");
@@ -136,12 +147,13 @@ class FormPostCommand {
 
 	public static void main(String[] args) throws MongoException, IOException {
 
-		if (args.length != 4 && args.length != 5) {
+		if (args.length != 4 && args.length != 6) {
 			System.err
 					.println("Manage the control documents for the FormPost server:");
 			System.err.println("  formPost create <endpoint> <id>");
 			System.err.println("  formPost ls <endpoint> <id>");
-			System.err.println("  formPost allow download <endpoint> <id>");
+			System.err
+					.println("  formPost allow download <endpoint> <id> [anySha] [all]");
 			System.exit(1);
 		}
 

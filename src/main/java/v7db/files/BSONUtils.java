@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSON;
 import org.bson.BSONObject;
@@ -130,6 +131,20 @@ public class BSONUtils {
 				+ "` into a String");
 	}
 
+	static Boolean toBoolean(Object x) {
+		if (x == null)
+			return null;
+		if (x instanceof Boolean)
+			return (Boolean) x;
+		if (x instanceof String) {
+			Boolean y = BooleanUtils.toBooleanObject((String) x);
+			if (y != null)
+				return y;
+		}
+		throw new IllegalArgumentException("cannot convert `" + x
+				+ "` into a Boolean");
+	}
+
 	static Long getLong(BSONObject b, String fieldName) {
 		return toLong(get(b, fieldName));
 	}
@@ -146,7 +161,7 @@ public class BSONUtils {
 		return toLong(getRequired(b, fieldName)).longValue();
 	}
 
-	static String getString(BSONObject b, String fieldName) {
+	public static String getString(BSONObject b, String fieldName) {
 		return toString(get(b, fieldName));
 	}
 
@@ -158,6 +173,14 @@ public class BSONUtils {
 			return (BSONObject) x;
 		throw new IllegalArgumentException("cannot convert `" + x
 				+ "` into a BSONObject");
+	}
+
+	/**
+	 * @return true, if the field exists, can be converted to a boolean, and is
+	 *         "true"
+	 */
+	public static boolean isTrue(BSONObject b, String fieldName) {
+		return Boolean.TRUE.equals(toBoolean(get(b, fieldName)));
 	}
 
 	static Object removeField(BSONObject b, String fieldName) {
