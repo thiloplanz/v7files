@@ -304,6 +304,15 @@ public class FormPostServlet extends HttpServlet {
 		String contentType = GridFSContentStorage.getContentType(file);
 		String name = GridFSContentStorage.getFilename(file);
 		Long length = GridFSContentStorage.getLength(file);
+		String eTag = Hex.encodeHexString(GridFSContentStorage.getSha(file));
+
+		String ifNoneMatch = request.getHeader("If-None-Match");
+		if (eTag.equals(ifNoneMatch)) {
+			response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+			return;
+		}
+
+		response.setHeader("ETag", eTag);
 		response.setHeader("Content-type", StringUtils.defaultString(
 				contentType, "application/octet-stream"));
 		if (StringUtils.isNotBlank(name))
