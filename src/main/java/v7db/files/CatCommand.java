@@ -26,8 +26,10 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import v7db.files.aws.S3ContentStorage;
+
+import com.amazonaws.services.s3.model.S3Object;
 import com.mongodb.MongoException;
-import com.mongodb.gridfs.GridFSDBFile;
 
 class CatCommand {
 
@@ -40,10 +42,9 @@ class CatCommand {
 			System.exit(1);
 		}
 
-		V7GridFS fs = new V7GridFS(Configuration.getMongo().getDB(
-				Configuration.getProperty("mongo.db")));
-
 		if ("-sha".equals(args[1])) {
+			S3ContentStorage storage = S3ContentStorage.configure(Configuration
+					.getProperties());
 			String sha = args[2];
 			try {
 				byte[] id;
@@ -55,18 +56,21 @@ class CatCommand {
 				}
 				if (id.length > 20)
 					throw new DecoderException("too long");
-				GridFSDBFile file = fs.storage.findContentByPrefix(id);
+				S3Object file = storage.findContentByPrefix(id);
 				if (file == null) {
 					System.err.println("file not found");
 					System.exit(1);
 				}
-				IOUtils.copy(fs.storage.readContent(file), System.out);
+				IOUtils.copy(storage.getInputStream(file), System.out);
 			} catch (DecoderException e) {
 				System.err.println("invalid parameter :" + sha
 						+ " is not a hex-encoded SHA-1 prefix");
 				System.exit(1);
 			}
 		} else {
+			V7GridFS fs = new V7GridFS(Configuration.getMongo().getDB(
+					Configuration.getProperty("mongo.db")));
+
 			String root = args[1];
 			String path = args[2];
 			String[] fullPath = ArrayUtils.add(StringUtils.split(path, '/'), 0,

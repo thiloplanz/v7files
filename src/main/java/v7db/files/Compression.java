@@ -37,7 +37,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class Compression {
+public class Compression {
 
 	// minimum overhead: 10 byte header, 8 byte trailer
 	static final int GZIP_STORAGE_OVERHEAD = 18;
@@ -115,7 +115,7 @@ class Compression {
 	 *         exception)
 	 */
 
-	static File gzip(File data) {
+	public static File gzip(File data) {
 		File file = null;
 		try {
 			file = File.createTempFile(data.getName(), ".gz");

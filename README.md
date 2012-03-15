@@ -1,10 +1,10 @@
-# v7files
+# v7files (experimental AWS branch)
 
-v7files is a WebDAV server backed by MongoDB GridFS file storage.
+v7files is a WebDAV server backed by MongoDB (and optionally Amazon S3).
 
 It is written in Java, using the Jetty embedded web server and the Milton WebDAV library.
 
-All file contents are stored in GridFS, but the file (and folder) metadata is [stored in separate collection](https://github.com/thiloplanz/v7files/wiki/StorageFormat),
+All file contents are stored in GridFS (or S3), but the file (and folder) metadata is [stored in separate collection](https://github.com/thiloplanz/v7files/wiki/StorageFormat),
 where it can also be versioned. Identical content is only stored once, even if more than one file refers (or used to refer) to it, 
 and content can also be compressed using zip compression (good for text files) or delta storage (good for files that are similar to others).
 
