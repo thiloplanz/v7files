@@ -22,7 +22,7 @@ import java.io.IOException;
 
 import org.apache.commons.codec.binary.Hex;
 
-import v7db.files.aws.S3ContentStorage;
+import v7db.files.aws.GridFSContentStorageWithS3;
 
 import com.mongodb.MongoException;
 
@@ -38,15 +38,16 @@ class UploadCommand {
 			System.exit(1);
 		}
 
-		S3ContentStorage storage = S3ContentStorage.configure(Configuration
-				.getProperties());
+		GridFSContentStorageWithS3 storage = GridFSContentStorageWithS3
+				.configure(Configuration.getMongo(), Configuration
+						.getProperties());
 
 		for (int i = 1; i < args.length; i++) {
 			File f = new File(args[i]);
 			if (f.isFile() && f.canRead()) {
 				try {
-					String sha = Hex.encodeHexString(storage.insertContents(f,
-							f.getName(), null));
+					String sha = Hex.encodeHexString(storage.storeInS3(f, f
+							.getName(), null, null));
 					System.out.format("-      %10d %80s %40s\n", f.length(), f
 							.getName(), sha);
 				} catch (Exception e) {

@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Properties;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -37,6 +38,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
+import com.mongodb.Mongo;
 import com.mongodb.WriteResult;
 
 public class V7GridFS {
@@ -47,9 +49,14 @@ public class V7GridFS {
 
 	final GridFSContentStorage storage;
 
-	public V7GridFS(DB db) {
+	private V7GridFS(DB db, GridFSContentStorage storage) {
 		files = db.getCollection(bucket);
-		storage = new GridFSContentStorage(db);
+		this.storage = storage;
+	}
+
+	public static V7GridFS configure(Mongo mongo, Properties props) {
+		return new V7GridFS(mongo.getDB(props.getProperty("mongo.db")),
+				GridFSContentStorage.configure(mongo, props));
 	}
 
 	public V7File getFile(String... path) {

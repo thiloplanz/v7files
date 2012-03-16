@@ -25,6 +25,8 @@ import org.apache.commons.codec.binary.Hex;
 import org.bson.BSONObject;
 import org.bson.BasicBSONObject;
 
+import v7db.files.aws.GridFSContentStorageWithS3;
+
 class OutOfBand {
 
 	static BSONObject basedOnGridFSContents(byte[] sha) {
@@ -50,6 +52,10 @@ class OutOfBand {
 				String store = (String) o.get("store");
 				if ("cat".equals(store))
 					return Concatenation.getInputStream(storage, o);
+				if ("s3".equals(store)) {
+					GridFSContentStorageWithS3 s3 = (GridFSContentStorageWithS3) storage;
+					return s3.getInputStream(o);
+				}
 				throw new IOException("unsupported storage scheme '" + store
 						+ "' on file "
 						+ Hex.encodeHexString((byte[]) gridFile.get("_id")));
@@ -60,12 +66,19 @@ class OutOfBand {
 					if (e instanceof IOException)
 						error = (IOException) e;
 					else
-						error = new IOException("error on alt storage " + o, e);
+						error = new IOException("error on alt storage "
+								+ o
+								+ " on file "
+								+ Hex.encodeHexString((byte[]) gridFile
+										.get("_id")), e);
 				else
-					error = new IOException("error on alt storage " + o + ":\n"
-							+ e, error);
+					error = new IOException("error on alt storage " + o
+							+ " on file "
+							+ Hex.encodeHexString((byte[]) gridFile.get("_id"))
+							+ ":\n" + e, error);
 			}
 		}
 		throw error;
 	}
+
 }

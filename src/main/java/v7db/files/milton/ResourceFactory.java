@@ -85,7 +85,7 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			// need to adjust mongo.db in case of multi-tenant mode
 			endpointProperties.put("mongo.db", dbName);
 
-			fs = new V7GridFS(mongo.getDB(dbName));
+			fs = V7GridFS.configure(mongo, endpointProperties);
 
 			ROOT = getProperty("root");
 			if (ROOT == null)

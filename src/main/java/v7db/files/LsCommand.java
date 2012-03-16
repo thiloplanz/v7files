@@ -37,8 +37,8 @@ class LsCommand {
 			System.exit(1);
 		}
 
-		V7GridFS fs = new V7GridFS(Configuration.getMongo().getDB(
-				Configuration.getProperty("mongo.db")));
+		V7GridFS fs = V7GridFS.configure(Configuration.getMongo(),
+				Configuration.getProperties());
 
 		String root = args[1];
 		String path = args[2];

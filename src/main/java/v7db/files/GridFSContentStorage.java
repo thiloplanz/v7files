@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
@@ -36,10 +37,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
 import org.bson.BasicBSONObject;
 
+import v7db.files.aws.GridFSContentStorageWithS3;
+
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
+import com.mongodb.Mongo;
 import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 import com.mongodb.gridfs.GridFSInputFile;
@@ -60,10 +64,18 @@ public class GridFSContentStorage {
 
 	private final DBCollection metaCollection;
 
-	public GridFSContentStorage(DB db) {
+	protected GridFSContentStorage(DB db) {
 		this.fs = new GridFS(db, "v7.fs");
 		this.metaCollection = fs.getDB().getCollectionFromString(
 				fs.getBucketName() + ".files");
+	}
+
+	public static GridFSContentStorage configure(Mongo mongo, Properties props) {
+		if (props.containsKey("s3.accessKey") && props.containsKey("s3.bucket"))
+			return GridFSContentStorageWithS3.configure(mongo, props);
+
+		return new GridFSContentStorage(mongo.getDB(props
+				.getProperty("mongo.db")));
 	}
 
 	GridFSDBFile findContent(byte[] sha) {
@@ -177,7 +189,7 @@ public class GridFSContentStorage {
 
 	}
 
-	void registerAlt(byte[] sha, BSONObject alt, String filename,
+	protected void registerAlt(byte[] sha, BSONObject alt, String filename,
 			Object fileId, String contentType) {
 		if (!alt.containsField("store"))
 			throw new IllegalArgumentException(

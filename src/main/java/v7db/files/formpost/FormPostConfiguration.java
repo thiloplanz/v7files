@@ -35,6 +35,8 @@ public class FormPostConfiguration {
 
 	private DB db;
 
+	private GridFSContentStorage storage;
+
 	public FormPostConfiguration(Properties properties) {
 		this.properties = properties;
 		String mode = Tenants.getTenancyMode(properties);
@@ -46,6 +48,9 @@ public class FormPostConfiguration {
 	public void init() throws UnknownHostException, MongoException {
 		Mongo mongo = Configuration.getMongo();
 		db = mongo.getDB(Tenants.getTenantDbName(mongo, properties, null));
+		Properties props = new Properties(properties);
+		props.setProperty("mongo.db", db.getName());
+		storage = GridFSContentStorage.configure(mongo, props);
 	}
 
 	public DBCollection getControlCollection() {
@@ -53,7 +58,7 @@ public class FormPostConfiguration {
 	}
 
 	public GridFSContentStorage getContentStorage() {
-		return new GridFSContentStorage(db);
+		return storage;
 	}
 
 }
