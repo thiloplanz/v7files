@@ -73,6 +73,8 @@ public class BSONUtils {
 	}
 
 	private static Object get(BSONObject b, String fieldName) {
+		if (b == null)
+			return null;
 		if (!fieldName.contains("."))
 			return notNull(b.get(fieldName));
 		String[] path = StringUtils.split(fieldName, ".", 2);

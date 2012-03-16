@@ -126,6 +126,26 @@ public class V7File {
 	}
 
 	/**
+	 * a code describing where the file is actually stored. This is just for
+	 * informative purposes, it is not enough information to actually load the
+	 * file.
+	 * 
+	 */
+	String getStore() {
+		byte[] inline = getInlineData(metaData);
+		if (inline != null)
+			return "inline";
+		loadGridFile();
+		String store = BSONUtils.getString(gridFile, "store");
+		if (store == null)
+			store = "raw";
+		if ("alt".equals(store)) {
+			store = store + ":" + BSONUtils.getString(gridFile, "alt.0.store");
+		}
+		return store;
+	}
+
+	/**
 	 * useful to send gzipped contents directly to a client that supports it,
 	 * without having to uncompress it first.
 	 * 

@@ -443,26 +443,26 @@ public class GridFSContentStorage {
 	 * 
 	 */
 
-	public BSONObject insertContents(byte[] data, int inlineUntil,
+	public final BSONObject insertContents(byte[] data, int inlineUntil,
 			String filename, String contentType) throws IOException {
 		return insertContentsAndBackRefs(data, null, inlineUntil, filename,
 				contentType);
 	}
 
-	public BSONObject insertContents(byte[] data, int offset, int len,
+	public final BSONObject insertContents(byte[] data, int offset, int len,
 			int inlineUntil, String filename, String contentType)
 			throws IOException {
 		return insertContentsAndBackRefs(data, offset, len, null, inlineUntil,
 				filename, contentType);
 	}
 
-	public BSONObject insertContents(File data, int inlineUntil,
+	public final BSONObject insertContents(File data, int inlineUntil,
 			String filename, String contentType) throws IOException {
 		return insertContentsAndBackRefs(data, null, inlineUntil, filename,
 				contentType);
 	}
 
-	BSONObject insertContentsAndBackRefs(byte[] data, Object fileId,
+	final BSONObject insertContentsAndBackRefs(byte[] data, Object fileId,
 			int inlineUntil, String filename, String contentType)
 			throws IOException {
 		if (data != null)
@@ -472,9 +472,9 @@ public class GridFSContentStorage {
 				filename, contentType);
 	}
 
-	BSONObject insertContentsAndBackRefs(byte[] data, int offset, int len,
-			Object fileId, int inlineUntil, String filename, String contentType)
-			throws IOException {
+	protected BSONObject insertContentsAndBackRefs(byte[] data, int offset,
+			int len, Object fileId, int inlineUntil, String filename,
+			String contentType) throws IOException {
 		BasicBSONObject metaData = new BasicBSONObject();
 
 		if (StringUtils.isNotBlank(filename))
@@ -497,7 +497,7 @@ public class GridFSContentStorage {
 		return metaData;
 	}
 
-	BSONObject insertContentsAndBackRefs(File data, Object fileId,
+	protected BSONObject insertContentsAndBackRefs(File data, Object fileId,
 			int inlineUntil, String filename, String contentType)
 			throws IOException {
 		if (data == null)

@@ -21,8 +21,7 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.commons.codec.binary.Hex;
-
-import v7db.files.aws.GridFSContentStorageWithS3;
+import org.bson.BSONObject;
 
 import com.mongodb.MongoException;
 
@@ -38,18 +37,27 @@ class UploadCommand {
 			System.exit(1);
 		}
 
-		GridFSContentStorageWithS3 storage = GridFSContentStorageWithS3
-				.configure(Configuration.getMongo(), Configuration
-						.getProperties());
+		GridFSContentStorage storage = GridFSContentStorage.configure(
+				Configuration.getMongo(), Configuration.getProperties());
 
 		for (int i = 1; i < args.length; i++) {
 			File f = new File(args[i]);
 			if (f.isFile() && f.canRead()) {
 				try {
-					String sha = Hex.encodeHexString(storage.storeInS3(f, f
-							.getName(), null, null));
-					System.out.format("-      %10d %80s %40s\n", f.length(), f
-							.getName(), sha);
+					BSONObject up = storage.insertContents(f, 0, f.getName(),
+							null);
+					byte[] _sha = GridFSContentStorage.getSha(up);
+					String sha = Hex.encodeHexString(_sha);
+					BSONObject x = storage.findContent(_sha);
+					String store = BSONUtils.getString(x, "store");
+					if (store == null)
+						store = "raw";
+					if ("alt".equals(store)) {
+						store = store + ":"
+								+ BSONUtils.getString(x, "alt.0.store");
+					}
+					System.out.format("-      %10d %80s %40s %10s\n", f
+							.length(), f.getName(), sha, store);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

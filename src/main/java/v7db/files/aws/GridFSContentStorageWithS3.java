@@ -1,5 +1,6 @@
 package v7db.files.aws;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -13,6 +14,7 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
+import org.bson.BasicBSONObject;
 
 import v7db.files.Compression;
 import v7db.files.GridFSContentStorage;
@@ -22,7 +24,6 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
-import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.Mongo;
 
@@ -56,10 +57,15 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 
 	private final String bucketName;
 
-	private GridFSContentStorageWithS3(DB db, AmazonS3 s3, String bucketName) {
+	// negative means "never"
+	private final int minimumSizeForS3;
+
+	private GridFSContentStorageWithS3(DB db, AmazonS3 s3, String bucketName,
+			int mimimumSize) {
 		super(db);
 		this.s3 = s3;
 		this.bucketName = bucketName;
+		minimumSizeForS3 = mimimumSize;
 	}
 
 	public static GridFSContentStorageWithS3 configure(Mongo mongo,
@@ -68,19 +74,8 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 				new BasicAWSCredentials(props.getProperty("s3.accessKey"),
 						props.getProperty("s3.secretKey")));
 		return new GridFSContentStorageWithS3(mongo.getDB(props
-				.getProperty("mongo.db")), s3, props.getProperty("s3.bucket"));
-	}
-
-	public byte[] storeInS3(File file, String filename, Object fileId,
-			String contentType) throws IOException {
-		byte[] sha = insertContents(file, contentType);
-
-		BasicDBObject result = new BasicDBObject();
-		result.put("store", "s3");
-		result.put("key", sha);
-		registerAlt(sha, result, filename, fileId, contentType);
-
-		return sha;
+				.getProperty("mongo.db")), s3, props.getProperty("s3.bucket"),
+				Integer.parseInt(props.getProperty("s3.threshold")));
 	}
 
 	private S3Object findS3Content(byte[] sha) throws IOException {
@@ -109,34 +104,6 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 		deflatedData.close();
 	}
 
-	private byte[] insertContents(File data, String contentType)
-			throws IOException {
-
-		FileInputStream fis = new FileInputStream(data);
-		byte[] sha = DigestUtils.sha(fis);
-		fis.close();
-
-		if (contentAlreadyExists(sha))
-			return sha;
-
-		final File compressed = Compression.gzip(data);
-		if (compressed != null) {
-			try {
-				insertGzipContents(new FileInputStream(compressed), compressed
-						.length(), sha, contentType);
-				return sha;
-			} finally {
-				compressed.delete();
-			}
-		}
-
-		String key = Hex.encodeHexString(sha);
-		ObjectMetadata metaData = makeMetaData(data.length(), contentType);
-		s3.putObject(bucketName, key, new FileInputStream(data), metaData);
-		return sha;
-
-	}
-
 	@Override
 	public InputStream getInputStream(BSONObject file) throws IOException {
 
@@ -162,4 +129,102 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 				+ encoding + "'");
 	}
 
+	@Override
+	protected BSONObject insertContentsAndBackRefs(byte[] data, int offset,
+			int len, Object fileId, int inlineUntil, String filename,
+			String contentType) throws IOException {
+		if (minimumSizeForS3 < 0 || len < minimumSizeForS3
+				|| len <= inlineUntil)
+			return super.insertContentsAndBackRefs(data, offset, len, fileId,
+					inlineUntil, filename, contentType);
+		byte[] sha = DigestUtils
+				.sha(new ByteArrayInputStream(data, offset, len));
+
+		if (contentAlreadyExists(sha))
+			return super.insertContentsAndBackRefs(data, offset, len, fileId,
+					inlineUntil, filename, contentType);
+
+		final byte[] compressed = Compression.gzip(data, offset, len);
+		if (compressed != null) {
+			insertGzipContents(new ByteArrayInputStream(compressed),
+					compressed.length, sha, contentType);
+		} else {
+			insertIntoS3(new ByteArrayInputStream(data, offset, len), len, sha,
+					contentType);
+		}
+
+		BasicBSONObject alt = new BasicBSONObject();
+		alt.put("store", "s3");
+		alt.put("key", sha);
+		registerAlt(sha, alt, filename, fileId, contentType);
+
+		BasicBSONObject metaData = new BasicBSONObject();
+
+		if (StringUtils.isNotBlank(filename))
+			metaData.append("filename", filename);
+
+		if (StringUtils.isNotBlank(contentType))
+			metaData.append("contentType", contentType);
+
+		metaData.append("sha", sha).append("length", len);
+
+		return metaData;
+
+	}
+
+	private void insertIntoS3(InputStream data, long length, byte[] sha,
+			String contentType) throws IOException {
+		String key = Hex.encodeHexString(sha);
+		ObjectMetadata metaData = makeMetaData(length, contentType);
+		s3.putObject(bucketName, key, data, metaData);
+		data.close();
+	}
+
+	@Override
+	protected BSONObject insertContentsAndBackRefs(File data, Object fileId,
+			int inlineUntil, String filename, String contentType)
+			throws IOException {
+		long len = data.length();
+		if (minimumSizeForS3 < 0 || len < minimumSizeForS3
+				|| len <= inlineUntil)
+			return super.insertContentsAndBackRefs(data, fileId, inlineUntil,
+					filename, contentType);
+
+		FileInputStream fis = new FileInputStream(data);
+		byte[] sha = DigestUtils.sha(fis);
+		fis.close();
+
+		if (contentAlreadyExists(sha))
+			return super.insertContentsAndBackRefs(data, fileId, inlineUntil,
+					filename, contentType);
+
+		final File compressed = Compression.gzip(data);
+		if (compressed != null) {
+			try {
+				insertGzipContents(new FileInputStream(compressed), compressed
+						.length(), sha, contentType);
+			} finally {
+				compressed.delete();
+			}
+		} else {
+			insertIntoS3(new FileInputStream(data), len, sha, contentType);
+		}
+
+		BasicBSONObject alt = new BasicBSONObject();
+		alt.put("store", "s3");
+		alt.put("key", sha);
+		registerAlt(sha, alt, filename, fileId, contentType);
+
+		BasicBSONObject metaData = new BasicBSONObject();
+
+		if (StringUtils.isNotBlank(filename))
+			metaData.append("filename", filename);
+
+		if (StringUtils.isNotBlank(contentType))
+			metaData.append("contentType", contentType);
+
+		metaData.append("sha", sha).append("length", len);
+
+		return metaData;
+	}
 }

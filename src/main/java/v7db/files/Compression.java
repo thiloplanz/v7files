@@ -61,7 +61,7 @@ public class Compression {
 	 * @return null, if the "gzipped" data is larger than the input (or there
 	 *         has been an exception)
 	 */
-	static byte[] gzip(byte[] data, int off, int len) {
+	public static byte[] gzip(byte[] data, int off, int len) {
 
 		if (len < GZIP_STORAGE_OVERHEAD)
 			return null;

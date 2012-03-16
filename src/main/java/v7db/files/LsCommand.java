@@ -66,8 +66,9 @@ class LsCommand {
 		}
 		for (V7File child : children) {
 			if (child.getLength() != null)
-				System.out.format("-      %10d %80s %10s\n", child.getLength(),
-						child.getName(), child.getDigest().substring(0, 10));
+				System.out.format("-      %10d %80s %10s %10s\n", child
+						.getLength(), child.getName(), child.getDigest()
+						.substring(0, 10), child.getStore());
 		}
 
 	}
