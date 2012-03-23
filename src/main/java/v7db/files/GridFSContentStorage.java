@@ -71,7 +71,8 @@ public class GridFSContentStorage {
 	}
 
 	public static GridFSContentStorage configure(Mongo mongo, Properties props) {
-		if (props.containsKey("s3.accessKey") && props.containsKey("s3.bucket"))
+		if (StringUtils.isNotBlank(props.getProperty("s3.accessKey"))
+				&& StringUtils.isNotBlank(props.getProperty("s3.bucket")))
 			return GridFSContentStorageWithS3.configure(mongo, props);
 
 		return new GridFSContentStorage(mongo.getDB(props
