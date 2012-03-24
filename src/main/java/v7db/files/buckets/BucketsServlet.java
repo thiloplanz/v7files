@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files.formpost;
+package v7db.files.buckets;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -51,18 +51,18 @@ import v7db.files.GridFSContentStorage;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
 
-public class FormPostServlet extends HttpServlet {
+public class BucketsServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
 
-	private DBCollection controlCollection;
+	private DBCollection bucketCollection;
 
 	private GridFSContentStorage storage;
 
-	private final FormPostConfiguration properties;
+	private final BucketsServiceConfiguration properties;
 
-	public FormPostServlet(Properties props) {
-		properties = new FormPostConfiguration(props);
+	public BucketsServlet(Properties props) {
+		properties = new BucketsServiceConfiguration(props);
 	}
 
 	@Override
@@ -71,7 +71,7 @@ public class FormPostServlet extends HttpServlet {
 
 		try {
 			properties.init();
-			controlCollection = properties.getControlCollection();
+			bucketCollection = properties.getBucketCollection();
 			storage = properties.getContentStorage();
 		} catch (Exception e) {
 			throw new ServletException(e);
@@ -84,13 +84,24 @@ public class FormPostServlet extends HttpServlet {
 
 		String _id = request.getPathInfo().substring(1);
 
-		BSONObject control = controlCollection.findOne(_id);
-		if (control == null) {
-			response.sendError(HttpServletResponse.SC_NOT_FOUND,
-					"Control document '" + _id + "' not found");
+		BSONObject bucket = bucketCollection.findOne(_id);
+		if (bucket == null) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Bucket '"
+					+ _id + "' not found");
 			return;
 		}
 
+		String mode = BSONUtils.getString(bucket, "POST");
+		if ("FormPost".equals(mode)) {
+			doFormPost(request, response, bucket);
+			return;
+		}
+		response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+				StringUtils.defaultString(mode, "POST"));
+	}
+
+	private void doFormPost(HttpServletRequest request,
+			HttpServletResponse response, BSONObject bucket) throws IOException {
 		ObjectId uploadId = new ObjectId();
 
 		BSONObject parameters = new BasicBSONObject();
@@ -143,13 +154,13 @@ public class FormPostServlet extends HttpServlet {
 		result.put("files", uploads);
 		result.put("parameters", parameters);
 
-		String redirect = BSONUtils.getString(control, "redirect");
+		bucketCollection.update(new BasicDBObject("_id", bucket.get("_id")),
+				new BasicDBObject("$push", new BasicDBObject("FormPost.data",
+						result)));
+
+		String redirect = BSONUtils.getString(bucket, "FormPost.redirect");
 		// redirect mode
 		if (StringUtils.isNotBlank(redirect)) {
-			controlCollection.update(new BasicDBObject("_id", _id),
-					new BasicDBObject("$push",
-							new BasicDBObject("data", result)));
-
 			response.sendRedirect(redirect + "?v7_formpost_id=" + uploadId);
 			return;
 		}
@@ -166,22 +177,19 @@ public class FormPostServlet extends HttpServlet {
 	protected void doGet(HttpServletRequest request,
 			HttpServletResponse response) throws ServletException, IOException {
 
-		// In the simplest case, every element is an ObjectId (data._id) for one
-		// the uploads.
-		// This allows a direct download using a GET request to the URL
-		// <endpoint>/<_id>/<data._id>/<fieldName>/<index>.
-
-		String[] split = StringUtils.split(request.getPathInfo(), '/');
-		if (split.length < 1) {
-			response.sendError(HttpServletResponse.SC_NOT_FOUND,
-					"Control document id not specified");
-			return;
-		}
-
+		String _id = request.getPathInfo().substring(1);
 		byte[] sha = null;
-		// sha parameter
-		if (StringUtils.isNotBlank(request.getParameter("sha"))) {
+
+		{
 			String s = request.getParameter("sha");
+
+			if (StringUtils.isBlank(s)) {
+				response.sendError(HttpServletResponse.SC_NOT_FOUND,
+						"Missing content digest");
+				return;
+			}
+
+			// sha parameter
 			try {
 				sha = Hex.decodeHex(s.toCharArray());
 			} catch (Exception e) {
@@ -191,111 +199,59 @@ public class FormPostServlet extends HttpServlet {
 			}
 		}
 
-		if (split.length < 2 && sha == null) {
-			response.sendError(HttpServletResponse.SC_NOT_FOUND,
-					"Upload id not specified");
-			return;
-		}
-		String _id = split[0];
-		String upload_id = split.length > 1 ? split[1] : null;
-		String fileFieldName = "file";
-		ObjectId _u = null;
-		if (upload_id != null)
-			try {
-				_u = new ObjectId(upload_id);
-			} catch (Exception e) {
-				response.sendError(HttpServletResponse.SC_NOT_FOUND,
-						"Invalid upload id '" + upload_id + "'");
-				return;
-			}
-		BSONObject control = controlCollection.findOne(new BasicDBObject("_id",
+		BSONObject bucket = bucketCollection.findOne(new BasicDBObject("_id",
 				_id));
-		if (control == null) {
-			response.sendError(HttpServletResponse.SC_NOT_FOUND,
-					"Control document '" + _id + "' not found");
+		if (bucket == null) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Bucket '"
+					+ _id + "' not found");
 			return;
 		}
+
+		String mode = BSONUtils.getString(bucket, "GET");
+		if ("FormPost".equals(mode)) {
+			doFormPostGet(request, response, bucket, sha);
+			return;
+		}
+		response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+				StringUtils.defaultString(mode, "GET"));
+		return;
+
+	}
+
+	private void doFormPostGet(HttpServletRequest request,
+			HttpServletResponse response, BSONObject bucket, byte[] sha)
+			throws IOException {
 
 		BSONObject file = null;
 
-		if (_u != null)
-			for (Object f : BSONUtils.values(control, "data")) {
-				if (f instanceof BSONObject) {
-					BSONObject bf = (BSONObject) f;
-					if (_u.equals(bf.get("_id"))) {
-						f = BSONUtils.getObject(bf, "files." + fileFieldName);
-						if (f instanceof BSONObject) {
-							file = (BSONObject) f;
-							break;
-						}
+		data: for (Object o : BSONUtils.values(bucket, "FormPost.data")) {
+			BSONObject upload = (BSONObject) o;
+			for (Object f : BSONUtils.values(upload, "files")) {
+				BSONObject bf = (BSONObject) f;
+				for (String fn : bf.keySet()) {
+					BSONObject x = (BSONObject) bf.get(fn);
+					byte[] theSha = GridFSContentStorage.getSha(x);
+					if (Arrays.equals(theSha, sha)) {
+						file = x;
+						break data;
 					}
 				}
 			}
-
-		if (sha != null) {
-			if (file != null) {
-				byte[] realSha = GridFSContentStorage.getSha(file);
-				if (!Arrays.equals(sha, realSha)) {
-					response.sendError(HttpServletResponse.SC_NOT_FOUND,
-							"Content digest mismatch");
-					return;
-				}
-			} else {
-				if (storage.contentAlreadyExists(sha)) {
-					file = new BasicBSONObject("sha", sha);
-				}
-			}
 		}
+
 		if (file == null) {
-			response.sendError(HttpServletResponse.SC_NOT_FOUND,
-					"Control document '" + _id + "' does not have upload id '"
-							+ upload_id + "'");
+			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Bucket '"
+					+ bucket.get("_id")
+					+ "' does not have a file matching digest '"
+					+ Hex.encodeHexString(sha) + "'");
 			return;
 		}
+
 		String customFilename = request.getParameter("filename");
 		if (StringUtils.isNotBlank(customFilename))
 			file.put("filename", customFilename);
 
-		for (Object download : BSONUtils.values(control, "downloads")) {
-			// a hex-encoded String is also allowed for ease of integration
-			if (download instanceof String) {
-				try {
-					byte[] b = Hex.decodeHex(((String) download).toCharArray());
-					// SHA-1 or ObjectId ?
-					if (b.length == 20) {
-						download = b;
-					} else
-						download = new ObjectId((String) download);
-				} catch (Exception e) {
-					continue;
-				}
-			}
-			if (download instanceof ObjectId) {
-				if (download.equals(_u)) {
-					sendFile(request, response, file);
-					return;
-				}
-				continue;
-			}
-			// SHA-1
-			if (download instanceof byte[]) {
-				if (download.equals(sha)) {
-					sendFile(request, response, file);
-					return;
-				}
-				continue;
-			}
-			if (download instanceof BSONObject) {
-				BSONObject b = (BSONObject) download;
-				if (BSONUtils.isTrue(b, "anySha")) {
-					sendFile(request, response, file);
-					return;
-				}
-			}
-		}
-
-		response.sendError(HttpServletResponse.SC_FORBIDDEN);
-		return;
+		sendFile(request, response, file);
 
 	}
 

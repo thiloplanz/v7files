@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files.formpost;
+package v7db.files.buckets;
 
 import java.net.UnknownHostException;
 import java.util.Properties;
@@ -29,13 +29,13 @@ import com.mongodb.DBCollection;
 import com.mongodb.Mongo;
 import com.mongodb.MongoException;
 
-public class FormPostConfiguration {
+public class BucketsServiceConfiguration {
 
 	private final Properties properties;
 
 	private DB db;
 
-	public FormPostConfiguration(Properties properties) {
+	public BucketsServiceConfiguration(Properties properties) {
 		this.properties = properties;
 		String mode = Tenants.getTenancyMode(properties);
 		if (!"single".equals(mode))
@@ -48,8 +48,8 @@ public class FormPostConfiguration {
 		db = mongo.getDB(Tenants.getTenantDbName(mongo, properties, null));
 	}
 
-	public DBCollection getControlCollection() {
-		return db.getCollection("v7files.formpost");
+	public DBCollection getBucketCollection() {
+		return db.getCollection("v7.buckets");
 	}
 
 	public GridFSContentStorage getContentStorage() {

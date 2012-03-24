@@ -23,7 +23,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
-import v7db.files.formpost.FormPostServlet;
+import v7db.files.buckets.BucketsServlet;
 import v7db.files.milton.MiltonServlet;
 
 class ServeCommand {
@@ -62,11 +62,11 @@ class ServeCommand {
 
 		{
 			String[] endpoints = Configuration
-					.getArrayProperty("formpost.endpoints");
+					.getArrayProperty("buckets.endpoints");
 
 			for (String endpoint : endpoints) {
 
-				ServletHolder servlet = new ServletHolder(new FormPostServlet(
+				ServletHolder servlet = new ServletHolder(new BucketsServlet(
 						Configuration.getEndpointProperties(endpoint)));
 				handler.addServlet(servlet, endpoint.equals("/") ? "/*"
 						: (endpoint + "/*"));

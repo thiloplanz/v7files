@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.Map.Entry;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.PropertyConfigurator;
 
@@ -77,8 +78,12 @@ public class Configuration {
 	/**
 	 * property string value is split by comma and trimmed for space
 	 */
-	public static String[] getArrayProperty(String key) {
-		return StringUtils.stripAll(StringUtils.split(getProperty(key), ','));
+	static String[] getArrayProperty(String key) {
+		String[] x = StringUtils.stripAll(StringUtils.split(getProperty(key),
+				','));
+		if (x == null)
+			x = ArrayUtils.EMPTY_STRING_ARRAY;
+		return x;
 	}
 
 	public static Set<String> checkEndpoints() {
