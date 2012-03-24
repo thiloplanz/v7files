@@ -19,6 +19,7 @@ package v7db.files.formpost;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -47,6 +48,7 @@ import org.bson.types.ObjectId;
 
 import v7db.files.BSONUtils;
 import v7db.files.GridFSContentStorage;
+import v7db.files.aws.GridFSContentStorageWithS3;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
@@ -301,10 +303,12 @@ public class FormPostServlet extends HttpServlet {
 
 	private void sendFile(HttpServletRequest request,
 			HttpServletResponse response, BSONObject file) throws IOException {
+
 		String contentType = GridFSContentStorage.getContentType(file);
 		String name = GridFSContentStorage.getFilename(file);
 		Long length = GridFSContentStorage.getLength(file);
-		String eTag = Hex.encodeHexString(GridFSContentStorage.getSha(file));
+		byte[] sha = GridFSContentStorage.getSha(file);
+		String eTag = Hex.encodeHexString(sha);
 
 		String ifNoneMatch = request.getHeader("If-None-Match");
 		if (eTag.equals(ifNoneMatch)) {
@@ -312,12 +316,25 @@ public class FormPostServlet extends HttpServlet {
 			return;
 		}
 
+		String contentDisposition = null;
+		if (StringUtils.isNotBlank(name))
+			contentDisposition = "attachment; filename=\"" + name + "\"";
+		if (storage instanceof GridFSContentStorageWithS3) {
+			// direct download from S3, using pre-signed URL
+			GridFSContentStorageWithS3 s3 = (GridFSContentStorageWithS3) storage;
+			URL directDownload = s3
+					.getS3DirectDownload(sha, contentDisposition);
+			if (directDownload != null) {
+				response.sendRedirect(directDownload.toExternalForm());
+				return;
+			}
+		}
+
 		response.setHeader("ETag", eTag);
 		response.setHeader("Content-type", StringUtils.defaultString(
 				contentType, "application/octet-stream"));
-		if (StringUtils.isNotBlank(name))
-			response.setHeader("Content-disposition", "attachment; filename=\""
-					+ name + "\"");
+		if (StringUtils.isNotBlank(contentDisposition))
+			response.setHeader("Content-disposition", contentDisposition);
 		if (length != null)
 			response.setContentLength(length.intValue());
 

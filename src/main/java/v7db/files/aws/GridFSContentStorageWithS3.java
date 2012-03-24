@@ -1,3 +1,20 @@
+/**
+ * Copyright (c) 2011-2012, Thilo Planz. All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package v7db.files.aws;
 
 import java.io.ByteArrayInputStream;
@@ -5,13 +22,17 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
 import org.bson.BasicBSONObject;
@@ -22,10 +43,13 @@ import v7db.files.GridFSContentStorage;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.ResponseHeaderOverrides;
 import com.amazonaws.services.s3.model.S3Object;
 import com.mongodb.DB;
 import com.mongodb.Mongo;
+import com.mongodb.gridfs.GridFSDBFile;
 
 /**
  * Content storage in Amazon S3 instead of Mongo GridFS.
@@ -60,12 +84,15 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 	// negative means "never"
 	private final int minimumSizeForS3;
 
+	private final boolean allowDirectDownloads;
+
 	private GridFSContentStorageWithS3(DB db, AmazonS3 s3, String bucketName,
-			int mimimumSize) {
+			int mimimumSize, boolean allowDirectDownloads) {
 		super(db);
 		this.s3 = s3;
 		this.bucketName = bucketName;
 		minimumSizeForS3 = mimimumSize;
+		this.allowDirectDownloads = allowDirectDownloads;
 	}
 
 	public static GridFSContentStorageWithS3 configure(Mongo mongo,
@@ -75,7 +102,9 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 						props.getProperty("s3.secretKey")));
 		return new GridFSContentStorageWithS3(mongo.getDB(props
 				.getProperty("mongo.db")), s3, props.getProperty("s3.bucket"),
-				Integer.parseInt(props.getProperty("s3.threshold")));
+				Integer.parseInt(props.getProperty("s3.threshold")),
+				BooleanUtils.toBoolean(props
+						.getProperty("s3.allowDirectDownloads")));
 	}
 
 	private S3Object findS3Content(byte[] sha) throws IOException {
@@ -111,6 +140,37 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 			return getS3InputStream((byte[]) file.get("key"));
 		}
 		return super.getInputStream(file);
+	}
+
+	@SuppressWarnings("unchecked")
+	public URL getS3DirectDownload(byte[] sha, String contentDisposition)
+			throws IOException {
+		if (!allowDirectDownloads)
+			return null;
+		GridFSDBFile file = findContent(sha);
+		if (file == null)
+			return null;
+		if ("alt".equals(file.get("store"))) {
+			List<BSONObject> alt = (List<BSONObject>) file.get("alt");
+			if (alt == null || alt.isEmpty())
+				return null;
+			for (BSONObject o : alt)
+				if ("s3".equals(o.get("store"))) {
+					GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(
+							bucketName, Hex.encodeHexString((byte[]) o
+									.get("key")));
+					generatePresignedUrlRequest.setExpiration(new Date(
+							2000000000000l));
+					if (StringUtils.isNotBlank(contentDisposition)) {
+						generatePresignedUrlRequest
+								.setResponseHeaders(new ResponseHeaderOverrides()
+										.withContentDisposition(contentDisposition));
+					}
+					return s3.generatePresignedUrl(generatePresignedUrlRequest);
+				}
+
+		}
+		return null;
 	}
 
 	private InputStream getS3InputStream(byte[] sha) throws IOException {

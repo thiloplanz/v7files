@@ -79,7 +79,7 @@ public class GridFSContentStorage {
 				.getProperty("mongo.db")));
 	}
 
-	GridFSDBFile findContent(byte[] sha) {
+	protected GridFSDBFile findContent(byte[] sha) {
 		return fs.findOne(new BasicDBObject("_id", sha));
 	}
 
