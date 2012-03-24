@@ -78,8 +78,18 @@ class ServeCommand {
 		final Server server = new Server(port);
 		server.setHandler(handler);
 
-		server.start();
-
+		try {
+			server.start();
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.err.println("failed to start HTTP server");
+			try {
+				server.stop();
+			} catch (Exception f) {
+				f.printStackTrace();
+				System.exit(1);
+			}
+		}
 		try {
 			System.in.read();
 			server.stop();
