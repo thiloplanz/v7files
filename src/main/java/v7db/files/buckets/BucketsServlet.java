@@ -17,6 +17,8 @@
 
 package v7db.files.buckets;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -96,8 +98,8 @@ public class BucketsServlet extends HttpServlet {
 			doFormPost(request, response, bucket);
 			return;
 		}
-		response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED,
-				StringUtils.defaultString(mode, "POST"));
+		// method not allowed
+		super.doPost(request, response);
 	}
 
 	private void doFormPost(HttpServletRequest request,
@@ -212,9 +214,12 @@ public class BucketsServlet extends HttpServlet {
 			doFormPostGet(request, response, bucket, sha);
 			return;
 		}
-		response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED,
-				StringUtils.defaultString(mode, "GET"));
-		return;
+		if ("EchoPut".equals(mode)) {
+			doEchoPutGet(request, response, bucket, sha);
+			return;
+		}
+		// method not allowed
+		super.doGet(request, response);
 
 	}
 
@@ -255,6 +260,27 @@ public class BucketsServlet extends HttpServlet {
 
 	}
 
+	private void doEchoPutGet(HttpServletRequest request,
+			HttpServletResponse response, BSONObject bucket, byte[] sha)
+			throws IOException {
+
+		BSONObject file = new BasicBSONObject("sha", sha);
+
+		if (!storage.contentAlreadyExists(sha)) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Bucket '"
+					+ bucket.get("_id")
+					+ "' does not have a file matching digest '"
+					+ Hex.encodeHexString(sha) + "'");
+			return;
+		}
+		String customFilename = request.getParameter("filename");
+		if (StringUtils.isNotBlank(customFilename))
+			file.put("filename", customFilename);
+
+		sendFile(request, response, file);
+
+	}
+
 	private void sendFile(HttpServletRequest request,
 			HttpServletResponse response, BSONObject file) throws IOException {
 		String contentType = GridFSContentStorage.getContentType(file);
@@ -283,6 +309,46 @@ public class BucketsServlet extends HttpServlet {
 		} finally {
 			in.close();
 		}
+	}
+
+	@Override
+	protected void doPut(HttpServletRequest request,
+			HttpServletResponse response) throws ServletException, IOException {
+		String _id = request.getPathInfo().substring(1);
+
+		BSONObject bucket = bucketCollection.findOne(_id);
+		if (bucket == null) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Bucket '"
+					+ _id + "' not found");
+			return;
+		}
+
+		String mode = BSONUtils.getString(bucket, "PUT");
+		if ("EchoPut".equals(mode)) {
+			doEchoPut(request, response, bucket);
+			return;
+		}
+		// method not allowed
+		super.doPut(request, response);
+	}
+
+	private void doEchoPut(HttpServletRequest request,
+			HttpServletResponse response, BSONObject bucket) throws IOException {
+
+		byte[] sha;
+		File tempFile = File.createTempFile("echoPut_", ".tmp");
+		try {
+			FileOutputStream fos = new FileOutputStream(tempFile);
+			IOUtils.copy(request.getInputStream(), fos);
+			fos.close();
+
+			sha = GridFSContentStorage.getSha(storage.insertContents(tempFile,
+					0, null, null));
+		} finally {
+			tempFile.delete();
+		}
+		response.setContentType("text/plain");
+		response.getWriter().write(Hex.encodeHexString(sha));
 	}
 
 }
