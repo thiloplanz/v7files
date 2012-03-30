@@ -20,18 +20,19 @@ package v7db.files.aws;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
@@ -39,12 +40,15 @@ import org.bson.BasicBSONObject;
 
 import v7db.files.Compression;
 import v7db.files.GridFSContentStorage;
+import v7db.files.OutOfBand;
 
+import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.ResponseHeaderOverrides;
 import com.amazonaws.services.s3.model.S3Object;
 import com.mongodb.DB;
@@ -95,16 +99,31 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 		this.allowDirectDownloads = allowDirectDownloads;
 	}
 
-	public static GridFSContentStorageWithS3 configure(Mongo mongo,
-			Properties props) {
-		AmazonS3 s3 = new AmazonS3Client(
+	public static AmazonS3 configureS3(Properties props) {
+		return new AmazonS3Client(
 				new BasicAWSCredentials(props.getProperty("s3.accessKey"),
 						props.getProperty("s3.secretKey")));
+	}
+
+	public static GridFSContentStorageWithS3 configure(Mongo mongo,
+			Properties props) {
+		AmazonS3 s3 = configureS3(props);
 		return new GridFSContentStorageWithS3(mongo.getDB(props
 				.getProperty("mongo.db")), s3, props.getProperty("s3.bucket"),
 				Integer.parseInt(props.getProperty("s3.threshold")),
 				BooleanUtils.toBoolean(props
 						.getProperty("s3.allowDirectDownloads")));
+	}
+
+	public boolean contentAlreadyExistsInS3(byte[] sha) throws IOException {
+		try {
+			findS3Content(sha);
+		} catch (AmazonServiceException e) {
+			if (404 == e.getStatusCode())
+				return false;
+			throw e;
+		}
+		return true;
 	}
 
 	private S3Object findS3Content(byte[] sha) throws IOException {
@@ -124,7 +143,7 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 		return metaData;
 	}
 
-	private void insertGzipContents(InputStream deflatedData, long length,
+	public void insertGzipContents(InputStream deflatedData, long length,
 			byte[] sha, String contentType) throws IOException {
 		String key = Hex.encodeHexString(sha);
 		ObjectMetadata metaData = makeMetaData(length, contentType);
@@ -142,7 +161,6 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 		return super.getInputStream(file);
 	}
 
-	@SuppressWarnings("unchecked")
 	public URL getS3DirectDownload(byte[] sha, String contentDisposition)
 			throws IOException {
 		if (!allowDirectDownloads)
@@ -151,23 +169,19 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 		if (file == null)
 			return null;
 		if ("alt".equals(file.get("store"))) {
-			List<BSONObject> alt = (List<BSONObject>) file.get("alt");
-			if (alt == null || alt.isEmpty())
-				return null;
-			for (BSONObject o : alt)
-				if ("s3".equals(o.get("store"))) {
-					GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(
-							bucketName, Hex.encodeHexString((byte[]) o
-									.get("key")));
-					generatePresignedUrlRequest.setExpiration(new Date(
-							2000000000000l));
-					if (StringUtils.isNotBlank(contentDisposition)) {
-						generatePresignedUrlRequest
-								.setResponseHeaders(new ResponseHeaderOverrides()
-										.withContentDisposition(contentDisposition));
-					}
-					return s3.generatePresignedUrl(generatePresignedUrlRequest);
+			BSONObject o = OutOfBand.getDescriptor(file, "s3");
+			if (o != null) {
+				GeneratePresignedUrlRequest generatePresignedUrlRequest = new GeneratePresignedUrlRequest(
+						bucketName, Hex.encodeHexString((byte[]) o.get("key")));
+				generatePresignedUrlRequest.setExpiration(new Date(
+						2000000000000l));
+				if (StringUtils.isNotBlank(contentDisposition)) {
+					generatePresignedUrlRequest
+							.setResponseHeaders(new ResponseHeaderOverrides()
+									.withContentDisposition(contentDisposition));
 				}
+				return s3.generatePresignedUrl(generatePresignedUrlRequest);
+			}
 
 		}
 		return null;
@@ -232,8 +246,31 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 
 	}
 
-	private void insertIntoS3(InputStream data, long length, byte[] sha,
+	private void insertIntoS3(File data, byte[] sha, String contentType) {
+		String key = Hex.encodeHexString(sha);
+		PutObjectRequest r = new PutObjectRequest(bucketName, key, data);
+		r.setMetadata(makeMetaData(data.length(), contentType));
+		s3.putObject(r);
+	}
+
+	public void insertIntoS3(InputStream data, long length, byte[] sha,
 			String contentType) throws IOException {
+
+		// work-around for timeouts with big streamed files: copy to local disk
+		if (length > 500000) {
+			File f = File.createTempFile("s3_upload_", ".tmp");
+			try {
+				FileOutputStream fos = new FileOutputStream(f);
+				IOUtils.copy(data, fos);
+				fos.close();
+				data.close();
+				insertIntoS3(f, sha, contentType);
+				return;
+			} finally {
+				f.delete();
+			}
+		}
+
 		String key = Hex.encodeHexString(sha);
 		ObjectMetadata metaData = makeMetaData(length, contentType);
 		s3.putObject(bucketName, key, data, metaData);
@@ -267,7 +304,7 @@ public class GridFSContentStorageWithS3 extends GridFSContentStorage {
 				compressed.delete();
 			}
 		} else {
-			insertIntoS3(new FileInputStream(data), len, sha, contentType);
+			insertIntoS3(data, sha, contentType);
 		}
 
 		BasicBSONObject alt = new BasicBSONObject();

@@ -337,9 +337,9 @@ public class GridFSContentStorage {
 		BasicDBObject addToSet = new BasicDBObject("alt", alt);
 		if (fileId != null)
 			addToSet.append("refs", fileId).append("refHistory", fileId);
-		if (fileId != null)
-			metaCollection.update(new BasicDBObject("_id", sha),
-					new BasicDBObject("$addToSet", addToSet));
+
+		metaCollection.update(new BasicDBObject("_id", sha), new BasicDBObject(
+				"$addToSet", addToSet));
 
 	}
 
@@ -399,7 +399,7 @@ public class GridFSContentStorage {
 		byte[] inline = getInlineData(file);
 		if (inline != null)
 			return new ByteArrayInputStream(inline);
-		byte[] sha = (byte[]) file.get("sha");
+		byte[] sha = getSha(file);
 		if (sha == null)
 			return null;
 
@@ -412,6 +412,21 @@ public class GridFSContentStorage {
 				name = Hex.encodeHexString(sha);
 			throw new IOException(e.getMessage() + " on file " + name);
 		}
+	}
+
+	public InputStream getInputStreamWithGzipContents(BSONObject file)
+			throws IOException {
+		byte[] inline = getInlineData(file);
+		if (inline != null)
+			return null;
+		byte[] sha = getSha(file);
+		if (sha == null)
+			return null;
+		GridFSDBFile gridFile = findContent(sha);
+		String store = (String) gridFile.get("store");
+		if ("gz".equals(store))
+			return gridFile.getInputStream();
+		return null;
 	}
 
 	InputStream getInputStream(GridFSDBFile gridFile) throws IOException,

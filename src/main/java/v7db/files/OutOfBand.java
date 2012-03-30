@@ -27,10 +27,21 @@ import org.bson.BasicBSONObject;
 
 import v7db.files.aws.GridFSContentStorageWithS3;
 
-class OutOfBand {
+public class OutOfBand {
 
 	static BSONObject basedOnGridFSContents(byte[] sha) {
 		return new BasicBSONObject("_id", sha);
+	}
+
+	@SuppressWarnings("unchecked")
+	public static BSONObject getDescriptor(BSONObject gridFile, String store) {
+		List<BSONObject> alt = (List<BSONObject>) gridFile.get("alt");
+		if (alt == null || alt.isEmpty())
+			return null;
+		for (BSONObject o : alt)
+			if (store.equals(o.get("store")))
+				return o;
+		return null;
 	}
 
 	/**

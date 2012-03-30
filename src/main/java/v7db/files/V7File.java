@@ -141,6 +141,12 @@ public class V7File {
 			store = "raw";
 		if ("alt".equals(store)) {
 			store = store + ":" + BSONUtils.getString(gridFile, "alt.0.store");
+		} else {
+			Object[] alt = BSONUtils.values(gridFile, "alt");
+			for (int i = 0; i < alt.length; i++) {
+				store += " alt:"
+						+ BSONUtils.getString(gridFile, "alt." + i + ".store");
+			}
 		}
 		return store;
 	}
