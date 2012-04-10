@@ -114,13 +114,15 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 				.getAuthenticationProvider(endpointProperties);
 	}
 
-	public Resource getResource(String host, String path) {
+	public Resource getResource(String host, String _path) {
 
-		path = substringAfter(path, MiltonServlet.request().getServletPath());
+		String servletPath = MiltonServlet.request().getServletPath();
+		String path = _path.equals(servletPath) ? "/" : substringAfter(_path,
+				servletPath);
 
 		if (!path.startsWith("/"))
-			throw new IllegalArgumentException(path + " "
-					+ MiltonServlet.request().getServletPath());
+			throw new IllegalArgumentException("path: " + _path
+					+ " servletPath: " + servletPath);
 
 		if ("/".equals(path)) {
 			return fakeLocking ? new LockableFolderResource(endpointName, fs
