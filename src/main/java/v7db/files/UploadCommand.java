@@ -18,10 +18,12 @@
 package v7db.files;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
-import org.apache.commons.codec.binary.Hex;
-import org.bson.BSONObject;
+import v7db.files.mongodb.MongoContentStorage;
+import v7db.files.spi.ContentSHA;
+import v7db.files.spi.ContentStorage;
 
 import com.mongodb.MongoException;
 
@@ -36,27 +38,19 @@ class UploadCommand {
 			System.exit(1);
 		}
 
-		GridFSContentStorage storage = new GridFSContentStorage(Configuration
+		ContentStorage storage = new MongoContentStorage(Configuration
 				.getMongo().getDB(Configuration.getProperty("mongo.db")));
 
 		for (int i = 1; i < args.length; i++) {
 			File f = new File(args[i]);
 			if (f.isFile() && f.canRead()) {
 				try {
-					BSONObject up = storage.insertContents(f, 0, f.getName(),
-							null);
-					byte[] _sha = GridFSContentStorage.getSha(up);
-					String sha = Hex.encodeHexString(_sha);
-					BSONObject x = storage.findContent(_sha);
-					String store = BSONUtils.getString(x, "store");
-					if (store == null)
-						store = "raw";
-					if ("alt".equals(store)) {
-						store = store + ":"
-								+ BSONUtils.getString(x, "alt.0.store");
-					}
-					System.out.format("-      %10d %80s %40s %10s\n", f
-							.length(), f.getName(), sha, store);
+					ContentSHA up = storage
+							.storeContent(new FileInputStream(f));
+
+					// TODO: display if chunked or not
+					System.out.format("-      %10d %80s %40s\n", f.length(), f
+							.getName(), up.getDigest());
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

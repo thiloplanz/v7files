@@ -21,8 +21,10 @@ import java.net.UnknownHostException;
 import java.util.Properties;
 
 import v7db.files.Configuration;
-import v7db.files.GridFSContentStorage;
+import v7db.files.ContentStorageFacade;
 import v7db.files.Tenants;
+import v7db.files.mongodb.MongoContentStorage;
+import v7db.files.mongodb.MongoReferenceTracking;
 
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -52,8 +54,9 @@ public class BucketsServiceConfiguration {
 		return db.getCollection("v7.buckets");
 	}
 
-	public GridFSContentStorage getContentStorage() {
-		return new GridFSContentStorage(db);
+	public ContentStorageFacade getContentStorage() {
+		return new ContentStorageFacade(new MongoContentStorage(db),
+				new MongoReferenceTracking(db));
 	}
 
 }

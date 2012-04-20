@@ -17,9 +17,6 @@
 
 package v7db.files;
 
-import static v7db.files.GridFSContentStorage.getInlineData;
-import static v7db.files.GridFSContentStorage.getSha;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -30,25 +27,28 @@ import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
 
+import v7db.files.spi.Content;
+import v7db.files.spi.ContentPointer;
+import v7db.files.spi.ContentSHA;
+import v7db.files.spi.InlineContent;
+
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
 import com.mongodb.WriteResult;
-import com.mongodb.gridfs.GridFSDBFile;
 
 public class V7File {
 
 	// lazy-loaded
-	private GridFSDBFile gridFile;
+	private Content gridFile;
 
 	private final V7GridFS gridFS;
-
-	private final GridFSContentStorage storage;
 
 	private final DBObject metaData;
 
@@ -58,25 +58,15 @@ public class V7File {
 		this.gridFS = gridFS;
 		this.metaData = metaData;
 		this.parent = parent;
-		storage = gridFS != null ? gridFS.storage : null;
 	}
 
 	static V7File lazy(V7GridFS gridFS, Object id) {
 		return new V7File(gridFS, new BasicDBObject("_id", id), null);
 	}
 
-	V7File(GridFSDBFile gridFile, GridFSContentStorage storage) {
-		this.gridFile = gridFile;
-		this.metaData = new BasicDBObject("filename", gridFile.getFilename())
-				.append("sha", gridFile.get("_id"));
-		this.parent = null;
-		this.gridFS = null;
-		this.storage = storage;
-	}
-
-	private void loadGridFile() {
+	private void loadGridFile() throws IOException {
 		if (gridFile == null)
-			gridFile = storage.findContent(getSha(metaData));
+			gridFile = gridFS.getContent(metaData);
 	}
 
 	public String getContentType() {
@@ -135,15 +125,10 @@ public class V7File {
 	 */
 
 	public InputStream getInputStreamWithGzipContents() throws IOException {
-		byte[] inline = getInlineData(metaData);
-		if (inline != null)
-			return null;
-		if (getSha(metaData) == null)
-			return null;
-		loadGridFile();
-		String store = (String) gridFile.get("store");
-		if ("gz".equals(store))
-			return gridFile.getInputStream();
+		// loadGridFile();
+		// String store = (String) gridFile.get("store");
+		// if ("gz".equals(store))
+		// return gridFile.getInputStream();
 		return null;
 	}
 
@@ -152,15 +137,10 @@ public class V7File {
 	 * @return null, if the file is not stored using gzip
 	 */
 	public Long getGZipLength() {
-		byte[] inline = getInlineData(metaData);
-		if (inline != null)
-			return null;
-		if (getSha(metaData) == null)
-			return null;
-		loadGridFile();
-		String store = (String) gridFile.get("store");
-		if ("gz".equals(store))
-			return gridFile.getLength();
+		// loadGridFile();
+		// String store = (String) gridFile.get("store");
+		// if ("gz".equals(store))
+		// return gridFile.getLength();
 		return null;
 	}
 
@@ -171,15 +151,10 @@ public class V7File {
 	 * @throws IOException
 	 */
 	public InputStream getInputStream() throws IOException {
-		byte[] inline = getInlineData(metaData);
-		if (inline != null)
-			return new ByteArrayInputStream(inline);
-		if (getSha(metaData) == null)
-			return null;
 		loadGridFile();
 
 		try {
-			return storage.getInputStream(gridFile);
+			return gridFile.getInputStream();
 		} catch (IllegalArgumentException e) {
 			throw new IOException(e.getMessage() + " on file " + getName());
 		}
@@ -212,28 +187,33 @@ public class V7File {
 		return new ByteArrayInputStream(data);
 	}
 
-	byte[] _getSha() {
-		return getSha(metaData);
-	}
-
 	public boolean hasContent() {
-		return getInlineData(metaData) != null || getSha(metaData) != null;
+		return gridFS.getContentPointer(metaData) != null;
 	}
 
 	public Long getLength() {
-		Object l = metaData.get("length");
-		if (l instanceof Long)
-			return (Long) l;
-		if (l instanceof Number)
-			return ((Number) l).longValue();
-		byte[] data = getInlineData(metaData);
-		if (data != null)
-			return Long.valueOf(data.length);
-		return null;
+		ContentPointer p = gridFS.getContentPointer(metaData);
+		if (p == null)
+			return null;
+		return p.getLength();
 	}
 
 	public String getDigest() {
-		return GridFSContentStorage.getDigest(metaData);
+		ContentPointer contentPointer = gridFS.getContentPointer(metaData);
+		if (contentPointer instanceof ContentSHA) {
+			return ((ContentSHA) contentPointer).getDigest();
+		}
+		if (contentPointer instanceof InlineContent) {
+			try {
+				return DigestUtils.shaHex(((InlineContent) contentPointer)
+						.getInputStream());
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
+		// TODO:
+		System.err.println("NO DIGEST!");
+		return null;
 	}
 
 	public List<V7File> getChildren() {

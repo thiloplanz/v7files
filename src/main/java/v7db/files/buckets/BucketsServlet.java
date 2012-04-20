@@ -34,6 +34,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
 import org.apache.commons.fileupload.FileUploadException;
@@ -48,10 +49,12 @@ import org.bson.BasicBSONObject;
 import org.bson.types.ObjectId;
 
 import v7db.files.BSONUtils;
-import v7db.files.GridFSContentStorage;
+import v7db.files.ContentStorageFacade;
+import v7db.files.spi.Content;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
+import com.mongodb.DBRef;
 
 public class BucketsServlet extends HttpServlet {
 
@@ -59,7 +62,7 @@ public class BucketsServlet extends HttpServlet {
 
 	private DBCollection bucketCollection;
 
-	private GridFSContentStorage storage;
+	private ContentStorageFacade storage;
 
 	private final BucketsServiceConfiguration properties;
 
@@ -144,12 +147,14 @@ public class BucketsServlet extends HttpServlet {
 			DiskFileItem f = (DiskFileItem) file;
 			// inline until 10KB
 			if (f.isInMemory()) {
-				uploads.put(f.getFieldName(), storage.insertContents(f.get(),
-						10240, f.getName(), f.getContentType()));
+				uploads.put(f.getFieldName(), storage
+						.inlineOrInsertContentsAndBackRefs(10240, f.get(),
+								uploadId, f.getName(), f.getContentType()));
 			} else {
-				uploads.put(f.getFieldName(), storage.insertContents(f
-						.getStoreLocation(), 10240, f.getName(), f
-						.getContentType()));
+				uploads.put(f.getFieldName(), storage
+						.inlineOrInsertContentsAndBackRefs(10240, f
+								.getStoreLocation(), uploadId, f.getName(), f
+								.getContentType()));
 			}
 			file.delete();
 		}
@@ -223,11 +228,27 @@ public class BucketsServlet extends HttpServlet {
 
 	}
 
+	static byte[] getInlineData(BSONObject metaData) {
+		return (byte[]) metaData.get("in");
+	}
+
+	private static byte[] getSha(BSONObject metaData) {
+		byte[] sha = (byte[]) metaData.get("sha");
+		if (sha != null)
+			return sha;
+		byte[] data = getInlineData(metaData);
+		if (data != null) {
+			return DigestUtils.sha(data);
+		}
+		return null;
+	}
+
 	private void doFormPostGet(HttpServletRequest request,
 			HttpServletResponse response, BSONObject bucket, byte[] sha)
 			throws IOException {
 
 		BSONObject file = null;
+		Content content = null;
 
 		data: for (Object o : BSONUtils.values(bucket, "FormPost.data")) {
 			BSONObject upload = (BSONObject) o;
@@ -235,7 +256,7 @@ public class BucketsServlet extends HttpServlet {
 				BSONObject bf = (BSONObject) f;
 				for (String fn : bf.keySet()) {
 					BSONObject x = (BSONObject) bf.get(fn);
-					byte[] theSha = GridFSContentStorage.getSha(x);
+					byte[] theSha = getSha(x);
 					if (Arrays.equals(theSha, sha)) {
 						file = x;
 						break data;
@@ -256,7 +277,7 @@ public class BucketsServlet extends HttpServlet {
 		if (StringUtils.isNotBlank(customFilename))
 			file.put("filename", customFilename);
 
-		sendFile(request, response, file);
+		sendFile(request, response, sha, file, content);
 
 	}
 
@@ -264,29 +285,32 @@ public class BucketsServlet extends HttpServlet {
 			HttpServletResponse response, BSONObject bucket, byte[] sha)
 			throws IOException {
 
-		BSONObject file = new BasicBSONObject("sha", sha);
+		Content content = storage.getContent(sha);
 
-		if (!storage.contentAlreadyExists(sha)) {
+		if (content == null) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND, "Bucket '"
 					+ bucket.get("_id")
 					+ "' does not have a file matching digest '"
 					+ Hex.encodeHexString(sha) + "'");
 			return;
 		}
+
+		BSONObject file = new BasicBSONObject("sha", sha);
+
 		String customFilename = request.getParameter("filename");
 		if (StringUtils.isNotBlank(customFilename))
 			file.put("filename", customFilename);
 
-		sendFile(request, response, file);
+		sendFile(request, response, sha, file, content);
 
 	}
 
 	private void sendFile(HttpServletRequest request,
-			HttpServletResponse response, BSONObject file) throws IOException {
-		String contentType = GridFSContentStorage.getContentType(file);
-		String name = GridFSContentStorage.getFilename(file);
-		Long length = GridFSContentStorage.getLength(file);
-		String eTag = Hex.encodeHexString(GridFSContentStorage.getSha(file));
+			HttpServletResponse response, byte[] sha, BSONObject file,
+			Content content) throws IOException {
+		String contentType = BSONUtils.getString(file, "contentType");
+		String name = BSONUtils.getString(file, "filename");
+		String eTag = Hex.encodeHexString(sha);
 
 		String ifNoneMatch = request.getHeader("If-None-Match");
 		if (eTag.equals(ifNoneMatch)) {
@@ -300,10 +324,10 @@ public class BucketsServlet extends HttpServlet {
 		if (StringUtils.isNotBlank(name))
 			response.setHeader("Content-disposition", "attachment; filename=\""
 					+ name + "\"");
-		if (length != null)
-			response.setContentLength(length.intValue());
 
-		InputStream in = storage.getInputStream(file);
+		response.setContentLength((int) content.getLength());
+
+		InputStream in = content.getInputStream();
 		try {
 			IOUtils.copy(in, response.getOutputStream());
 		} finally {
@@ -342,13 +366,14 @@ public class BucketsServlet extends HttpServlet {
 			IOUtils.copy(request.getInputStream(), fos);
 			fos.close();
 
-			sha = GridFSContentStorage.getSha(storage.insertContents(tempFile,
-					0, null, null));
+			BSONObject content = storage.insertContentsAndBackRefs(tempFile,
+					new DBRef(null, bucketCollection.getName(), bucket
+							.get("_id")), null, null);
+			sha = (byte[]) content.get("sha");
 		} finally {
 			tempFile.delete();
 		}
 		response.setContentType("text/plain");
 		response.getWriter().write(Hex.encodeHexString(sha));
 	}
-
 }

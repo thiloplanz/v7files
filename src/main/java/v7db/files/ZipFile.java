@@ -18,9 +18,14 @@
 package v7db.files;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import net.lingala.zip4j.core.HeaderReader;
 import net.lingala.zip4j.exception.ZipException;
@@ -28,6 +33,14 @@ import net.lingala.zip4j.model.FileHeader;
 import net.lingala.zip4j.model.LocalFileHeader;
 import net.lingala.zip4j.model.ZipModel;
 import net.lingala.zip4j.unzip.UnzipEngine;
+
+import org.apache.commons.io.IOUtils;
+
+import v7db.files.spi.Content;
+import v7db.files.spi.ContentPointer;
+import v7db.files.spi.ContentStorage;
+import v7db.files.spi.InlineContent;
+import v7db.files.spi.StorageScheme;
 
 /**
  * Utility to store and index a ZipFile.
@@ -43,22 +56,47 @@ import net.lingala.zip4j.unzip.UnzipEngine;
 
 public class ZipFile {
 
-	public static final String CONTENT_TYPE = "application/zip";
+	public static final class ContentFromZipFile implements StorageScheme {
 
-	public static Object addZipFile(V7GridFS fs, File zipFile,
-			Object parentFileId, String filename) throws IOException {
-		// make sure we have the contents first
-		byte[] sha = GridFSContentStorage.getSha(fs.storage.insertContents(
-				zipFile, 0, filename, CONTENT_TYPE));
+		public Content getContent(ContentStorage storage,
+				Map<String, Object> data) throws IOException {
+			byte[] base = MapUtils.getRequiredBytes(data, "base.sha");
+			long offset = MapUtils.getRequiredLong(data, "off");
+			long length = MapUtils.getRequiredLong(data, "end") - offset;
+			byte[] unzipped = IOUtils.toByteArray(Compression.unzip(storage
+					.getContent(base).getInputStream(offset, length)));
+			return new InlineContent(unzipped);
+		}
 
+		public String getId() {
+			return "zip";
+		}
+
+	}
+
+	/**
+	 * index all individual files found in a zip archive already in storage
+	 * 
+	 * @throws IOException
+	 */
+	public static final void index(ContentStorage storage,
+			ContentPointer zipFile) throws IOException {
+		Content zip = storage.getContent(zipFile);
+		if (zip == null)
+			throw new IllegalArgumentException("invalid ContentPointer "
+					+ zipFile);
+
+		File tmp = File.createTempFile("v7files_zipfile_extractfile_", ".zip");
 		try {
-			// open up the zip file
-			HeaderReader r = new HeaderReader(
-					new RandomAccessFile(zipFile, "r"));
-			ZipModel model = r.readAllHeaders();
-			model.setZipFile(filename);
+			OutputStream f = new FileOutputStream(tmp);
+			IOUtils.copy(zip.getInputStream(), f);
+			f.close();
 
-			// index all component files
+			// open up the zip file
+			HeaderReader r = new HeaderReader(new RandomAccessFile(tmp, "r"));
+			ZipModel model = r.readAllHeaders();
+			model.setZipFile(tmp.getAbsolutePath());
+			Map<String, Object> map = zipFile.serialize();
 			List<?> fhs = model.getCentralDirectory().getFileHeaders();
 			for (Object _fh : fhs) {
 				FileHeader fh = (FileHeader) _fh;
@@ -67,19 +105,83 @@ public class ZipFile {
 				en.getInputStream();
 				LocalFileHeader lh = en.getLocalFileHeader();
 
-				Concatenation.storeConcatenation(fs.storage, lh.getFileName(),
-						null, null, Concatenation.zipEntryInGridFSContents(sha,
-								(int) fh.getOffsetLocalHeader(), (int) (lh
-										.getOffsetStartOfData() - fh
-										.getOffsetLocalHeader()), (int) lh
-										.getCompressedSize()));
+				store(storage, map, fh, lh);
 
 			}
+
 		} catch (ZipException e) {
-			throw new IOException("failed to index zip file " + zipFile, e);
+			throw new IllegalArgumentException(
+					"ContentPointer does not refer to a zip file: " + zipFile,
+					e);
+		} finally {
+			tmp.delete();
 		}
-		// the finally add the zip file to the file system tree
-		return fs.addFile(zipFile, parentFileId, filename, CONTENT_TYPE);
+
+	}
+
+	/**
+	 * find the data indicated by the ContentPointer, treats it as a zip
+	 * archive, extracts the named file inside the archive, stores a reference
+	 * to it in the ContentStorage and returns a ContentPointer to it.
+	 * 
+	 * @throws FileNotFoundException
+	 *             if the archive exists, but does not contain the named file
+	 * @throws IllegalArgumentException
+	 *             if the ContentPointer does not refer to a zip archive
+	 * 
+	 */
+	public static final ContentPointer extractFile(ContentStorage storage,
+			ContentPointer zipFile, String fileName) throws IOException {
+		Content zip = storage.getContent(zipFile);
+		if (zip == null)
+			throw new IllegalArgumentException("invalid ContentPointer "
+					+ zipFile);
+
+		File tmp = File.createTempFile("v7files_zipfile_extractfile_", ".zip");
+		try {
+			OutputStream f = new FileOutputStream(tmp);
+			IOUtils.copy(zip.getInputStream(), f);
+			f.close();
+
+			// open up the zip file
+			HeaderReader r = new HeaderReader(new RandomAccessFile(tmp, "r"));
+			ZipModel model = r.readAllHeaders();
+			model.setZipFile(tmp.getAbsolutePath());
+
+			List<?> fhs = model.getCentralDirectory().getFileHeaders();
+			for (Object _fh : fhs) {
+				FileHeader fh = (FileHeader) _fh;
+				if (fileName.equals(fh.getFileName())) {
+					UnzipEngine en = new UnzipEngine(model, fh);
+					// this will read the local file header
+					en.getInputStream();
+					LocalFileHeader lh = en.getLocalFileHeader();
+					return store(storage, zipFile.serialize(), fh, lh);
+				}
+
+			}
+
+		} catch (ZipException e) {
+			throw new IllegalArgumentException(
+					"ContentPointer does not refer to a zip file: " + zipFile,
+					e);
+		} finally {
+			tmp.delete();
+		}
+		throw new FileNotFoundException("ContentPointer does not contain "
+				+ fileName + ": " + zipFile);
+	}
+
+	private static ContentPointer store(ContentStorage storage,
+			Map<String, Object> zipFile, FileHeader fh, LocalFileHeader lh)
+			throws IOException {
+		Map<String, Object> cat = new HashMap<String, Object>();
+		cat.put("store", "zip");
+		cat.put("base", zipFile);
+		cat.put("off", fh.getOffsetLocalHeader());
+		cat.put("length", fh.getUncompressedSize());
+		cat.put("end", lh.getOffsetStartOfData() + lh.getCompressedSize());
+		return storage.storeContent(cat);
 	}
 
 }

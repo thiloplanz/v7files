@@ -33,6 +33,11 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
 import org.bson.types.ObjectId;
 
+import v7db.files.mongodb.MongoContentStorage;
+import v7db.files.mongodb.MongoReferenceTracking;
+import v7db.files.spi.Content;
+import v7db.files.spi.ContentPointer;
+
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -41,15 +46,14 @@ import com.mongodb.WriteResult;
 
 public class V7GridFS {
 
-	private static final String bucket = "v7files";
-
 	private final DBCollection files;
 
-	final GridFSContentStorage storage;
+	private final ContentStorageFacade storage;
 
 	public V7GridFS(DB db) {
-		files = db.getCollection(bucket);
-		storage = new GridFSContentStorage(db);
+		files = db.getCollection("v7files.files");
+		storage = new ContentStorageFacade(new MongoContentStorage(db),
+				new MongoReferenceTracking(db));
 	}
 
 	public V7File getFile(String... path) {
@@ -124,12 +128,8 @@ public class V7GridFS {
 		BasicDBObject metaData = new BasicDBObject("parent", parentFileId)
 				.append("_id", fileId);
 
-		// for up to 55 bytes, storing the complete file inline
-		// takes less space than just storing the SHA-1 and length
-		// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32) + 2*12
-		// (ObjectId back-references)
 		metaData.putAll(storage.insertContentsAndBackRefs(data, offset, len,
-				fileId, 55, filename, contentType));
+				fileId, filename, contentType));
 
 		insertMetaData(metaData);
 		return fileId;
@@ -147,7 +147,7 @@ public class V7GridFS {
 		BasicDBObject metaData = new BasicDBObject("parent", parentFileId)
 				.append("_id", fileId);
 
-		metaData.putAll(storage.insertContentsAndBackRefs(data, fileId, 55,
+		metaData.putAll(storage.insertContentsAndBackRefs(data, fileId,
 				filename, contentType));
 
 		insertMetaData(metaData);
@@ -265,16 +265,16 @@ public class V7GridFS {
 			throws IOException {
 
 		Object fileId = metaData.get("_id");
-		byte[] oldSha = GridFSContentStorage.getSha(metaData);
+		ContentPointer oldContents = getContentPointer(metaData);
 		String filename = (String) metaData.get("filename");
 		String contentType = (String) metaData.get("contentType");
 
 		BSONObject newContent = storage.insertContentsAndBackRefs(contents,
-				fileId, 55, filename, contentType);
+				fileId, filename, contentType);
 
 		// check if it has changed
-		byte[] newSha = GridFSContentStorage.getSha(newContent);
-		if (Arrays.equals(oldSha, newSha))
+		ContentPointer newContents = getContentPointer(newContent);
+		if (newContents.contentEquals(oldContents))
 			return;
 
 		metaData.removeField("sha");
@@ -284,14 +284,13 @@ public class V7GridFS {
 		metaData.putAll(newContent);
 
 		updateMetaData(metaData);
-		storage.removeRef(oldSha, fileId);
 	}
 
 	private void updateContents(DBObject metaData, byte[] contents, int offset,
 			int len) throws IOException {
 
 		Object fileId = metaData.get("_id");
-		byte[] oldSha = GridFSContentStorage.getSha(metaData);
+		ContentPointer oldContents = getContentPointer(metaData);
 		String filename = (String) metaData.get("filename");
 		String contentType = (String) metaData.get("contentType");
 
@@ -300,11 +299,11 @@ public class V7GridFS {
 		// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32) + 2*12
 		// (ObjectId back-references)
 		BSONObject newContent = storage.insertContentsAndBackRefs(contents,
-				offset, len, fileId, 55, filename, contentType);
+				offset, len, fileId, filename, contentType);
 
 		// check if it has changed
-		byte[] newSha = GridFSContentStorage.getSha(newContent);
-		if (Arrays.equals(oldSha, newSha))
+		ContentPointer newContents = getContentPointer(newContent);
+		if (newContents.contentEquals(oldContents))
 			return;
 
 		metaData.removeField("sha");
@@ -314,7 +313,6 @@ public class V7GridFS {
 		metaData.putAll(newContent);
 
 		updateMetaData(metaData);
-		storage.removeRef(oldSha, fileId);
 	}
 
 	public V7File getChild(V7File parentFile, String childName) {
@@ -327,10 +325,18 @@ public class V7GridFS {
 
 	void delete(V7File file) throws IOException {
 		// TODO: should check the version present in the db
-		byte[] oldSha = file._getSha();
 		Vermongo.remove(files, file.getId(), new BasicDBObject("deleted_at",
 				new Date()));
-		storage.removeRef(oldSha, file.getId());
+		storage.insertContentsAndBackRefs(null, file.getId(), null, null);
+	}
+
+	ContentPointer getContentPointer(BSONObject metaData) {
+		return storage.getContentPointer(metaData);
+	}
+
+	Content getContent(BSONObject metaData) throws IOException {
+		ContentPointer pointer = storage.getContentPointer(metaData);
+		return storage.getContent(pointer);
 	}
 
 }

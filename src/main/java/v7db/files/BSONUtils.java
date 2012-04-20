@@ -41,7 +41,7 @@ import org.bson.BSONObject;
 
 public class BSONUtils {
 
-	private static <T> T notNull(T x) {
+	static <T> T notNull(T x) {
 		if (x == null)
 			return x;
 		if (x instanceof Map<?, ?>) {
@@ -72,7 +72,7 @@ public class BSONUtils {
 
 	}
 
-	private static Object get(BSONObject b, String fieldName) {
+	static Object get(BSONObject b, String fieldName) {
 		if (!fieldName.contains("."))
 			return notNull(b.get(fieldName));
 		String[] path = StringUtils.split(fieldName, ".", 2);
@@ -157,7 +157,7 @@ public class BSONUtils {
 		return toInteger(getRequired(b, fieldName)).intValue();
 	}
 
-	static long getRequiredLong(BSONObject b, String fieldName) {
+	public static long getRequiredLong(BSONObject b, String fieldName) {
 		return toLong(getRequired(b, fieldName)).longValue();
 	}
 

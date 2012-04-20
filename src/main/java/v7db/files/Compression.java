@@ -37,7 +37,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class Compression {
+public class Compression {
 
 	// minimum overhead: 10 byte header, 8 byte trailer
 	static final int GZIP_STORAGE_OVERHEAD = 18;
@@ -61,7 +61,7 @@ class Compression {
 	 * @return null, if the "gzipped" data is larger than the input (or there
 	 *         has been an exception)
 	 */
-	static byte[] gzip(byte[] data, int off, int len) {
+	public static byte[] gzip(byte[] data, int off, int len) {
 
 		if (len < GZIP_STORAGE_OVERHEAD)
 			return null;
