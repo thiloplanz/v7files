@@ -27,6 +27,7 @@
 
 	<build>
 		<plugins>
+		<!--  
 			<plugin>
 				<groupId>com.mycila.maven-license-plugin</groupId>
 				<artifactId>maven-license-plugin</artifactId>
@@ -39,6 +40,7 @@
 					</excludes>
 				</configuration>
 			</plugin>
+			-->
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
 				<configuration>
@@ -71,7 +73,7 @@
 		<dependency>
 			<groupId>com.ettrema</groupId>
 			<artifactId>milton-servlet</artifactId>
-			<version>1.6.8</version>
+			<version>1.7.2</version>
 			<type>jar</type>
 			<scope>compile</scope>
 			<exclusions>
