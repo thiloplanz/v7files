@@ -43,7 +43,7 @@ public class MongoContentStorageTest extends MockMongoTestCaseSupport {
 
 	public void testRoundtrip() throws MongoException, IOException {
 
-		Mongo mongo = new Mongo();
+		Mongo mongo = getMongo();
 		ContentStorage storage = new MongoContentStorage(mongo.getDB("test")
 				.getCollection("v7files.content"));
 
@@ -73,7 +73,7 @@ public class MongoContentStorageTest extends MockMongoTestCaseSupport {
 		prepareMockData("test.v7files.content", new BasicBSONObject("_id", sha)
 				.append("store", "gz").append("zin", compressed));
 
-		Mongo mongo = new Mongo();
+		Mongo mongo = getMongo();
 		ContentStorage storage = new MongoContentStorage(mongo.getDB("test")
 				.getCollection("v7files.content"));
 
@@ -105,7 +105,7 @@ public class MongoContentStorageTest extends MockMongoTestCaseSupport {
 								"length", data1.length), new BasicBSONObject(
 								"sha", sha2).append("length", data2.length))));
 
-		Mongo mongo = new Mongo();
+		Mongo mongo = getMongo();
 		ContentStorage storage = new MongoContentStorage(mongo.getDB("test")
 				.getCollection("v7files.content"));
 
@@ -124,7 +124,7 @@ public class MongoContentStorageTest extends MockMongoTestCaseSupport {
 		prepareMockData("test.v7files.content", new BasicBSONObject("_id", sha)
 				.append("in", data));
 
-		Mongo mongo = new Mongo();
+		Mongo mongo = getMongo();
 		MongoContentStorage storage = new MongoContentStorage(mongo
 				.getDB("test"));
 
@@ -146,7 +146,7 @@ public class MongoContentStorageTest extends MockMongoTestCaseSupport {
 		new Random(12345).nextBytes(data);
 		byte[] sha = DigestUtils.sha(data);
 
-		Mongo mongo = new Mongo();
+		Mongo mongo = getMongo();
 		MongoContentStorage storage = new MongoContentStorage(mongo
 				.getDB("test"));
 

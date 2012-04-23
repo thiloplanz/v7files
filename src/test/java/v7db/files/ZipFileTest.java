@@ -31,7 +31,6 @@ import v7db.files.mongodb.MongoContentStorage;
 import v7db.files.spi.ContentPointer;
 import v7db.files.spi.ContentStorage;
 
-import com.mongodb.Mongo;
 import com.mongodb.MongoException;
 
 public class ZipFileTest extends MockMongoTestCaseSupport {
@@ -39,8 +38,8 @@ public class ZipFileTest extends MockMongoTestCaseSupport {
 	public void testPullOutFileFromZip() throws MongoException, IOException,
 			ZipException, DecoderException {
 
-		ContentStorage storage = new MongoContentStorage(new Mongo()
-				.getDB("test"));
+		ContentStorage storage = new MongoContentStorage(getMongo().getDB(
+				"test"));
 
 		ContentPointer zip = storage.storeContent(getClass()
 				.getResourceAsStream("mongodb.epub"));
@@ -56,8 +55,8 @@ public class ZipFileTest extends MockMongoTestCaseSupport {
 	public void testIndexZipFile() throws MongoException, IOException,
 			ZipException, DecoderException {
 
-		ContentStorage storage = new MongoContentStorage(new Mongo()
-				.getDB("test"));
+		ContentStorage storage = new MongoContentStorage(getMongo().getDB(
+				"test"));
 
 		ContentPointer zip = storage.storeContent(getClass()
 				.getResourceAsStream("mongodb.epub"));

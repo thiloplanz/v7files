@@ -26,11 +26,8 @@ import jmockmongo.MockMongoTestCaseSupport;
 import org.apache.commons.io.IOUtils;
 import org.bson.BasicBSONObject;
 
-import com.mongodb.Mongo;
-
 public class V7GridFSTest extends MockMongoTestCaseSupport {
 
-	private Mongo mongo;
 	private V7GridFS gridFS;
 
 	@Override
@@ -39,13 +36,11 @@ public class V7GridFSTest extends MockMongoTestCaseSupport {
 		// the root folder
 		prepareMockData("test.v7files.files",
 				new BasicBSONObject("_id", "root"));
-		mongo = new Mongo();
-		gridFS = new V7GridFS(mongo.getDB("test"));
+		gridFS = new V7GridFS(getMongo().getDB("test"));
 	}
 
 	@Override
 	protected void tearDown() throws Exception {
-		mongo.close();
 		super.tearDown();
 	}
 

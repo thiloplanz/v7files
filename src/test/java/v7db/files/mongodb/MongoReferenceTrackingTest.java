@@ -39,7 +39,7 @@ public class MongoReferenceTrackingTest extends MockMongoTestCaseSupport {
 
 	public void testInsert() throws MongoException, IOException {
 
-		Mongo mongo = new Mongo();
+		Mongo mongo = getMongo();
 
 		ReferenceTracking refs = new MongoReferenceTracking(mongo.getDB("test")
 				.getCollection("v7files.refs"));
@@ -65,7 +65,7 @@ public class MongoReferenceTrackingTest extends MockMongoTestCaseSupport {
 				.append("refs", new Object[] { oldRef }).append("refHistory",
 						new Object[] { oldRef }));
 
-		Mongo mongo = new Mongo();
+		Mongo mongo = getMongo();
 
 		ReferenceTracking refs = new MongoReferenceTracking(mongo.getDB("test")
 				.getCollection("v7files.refs"));
@@ -86,7 +86,7 @@ public class MongoReferenceTrackingTest extends MockMongoTestCaseSupport {
 
 	public void testPurge() throws MongoException, IOException,
 			DecoderException {
-		Mongo mongo = new Mongo();
+		Mongo mongo = getMongo();
 
 		DBCollection contents = mongo.getDB("test").getCollection(
 				"v7files.content");
