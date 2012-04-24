@@ -54,6 +54,15 @@
 					</descriptorRefs>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>2.3.2</version>
+				<configuration>
+					<source>6</source>
+					<target>6</target>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 
@@ -62,10 +71,6 @@
 		<repository>
 			<id>ettrema-repo</id>
 			<url>http://www.ettrema.com/maven2</url>
-		</repository>
-		<repository>
-			<id>grizzly-repo</id>
-			<url>https://maven.java.net/content/repositories/releases</url>
 		</repository>
 	</repositories>
 
