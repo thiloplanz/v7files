@@ -15,6 +15,10 @@
 		<system>Github</system>
 		<url>https://github.com/thiloplanz/v7files/issues</url>
 	</issueManagement>
+	<ciManagement>
+		<system>Jenkins</system>
+		<url>https://thiloplanz.ci.cloudbees.com/job/v7files/</url>
+	</ciManagement>
 	<inceptionYear>2011</inceptionYear>
 	<scm>
 		<url>https://github.com/thiloplanz/v7files</url>
@@ -71,6 +75,10 @@
 		<repository>
 			<id>ettrema-repo</id>
 			<url>http://www.ettrema.com/maven2</url>
+		</repository>
+		<repository>
+			<id>thiloplanz-snapshot</id>
+			<url>http://repository-thiloplanz.forge.cloudbees.com/snapshot/</url>
 		</repository>
 	</repositories>
 
