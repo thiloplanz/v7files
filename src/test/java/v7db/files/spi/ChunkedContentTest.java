@@ -17,6 +17,7 @@
 package v7db.files.spi;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 import junit.framework.TestCase;
 
@@ -34,6 +35,26 @@ public class ChunkedContentTest extends TestCase {
 		assertEquals("rst chunk second", IOUtils.toString(c.getInputStream(2,
 				16)));
 
+	}
+
+	public void testReadTooMuch() throws IOException {
+		{
+			ChunkedContent c = new ChunkedContent(new InlineContent(
+					"first chunk".getBytes()), new InlineContent(
+					" second chunk".getBytes()));
+			InputStream is = c.getInputStream();
+			assertEquals("first chunk second chunk", IOUtils.toString(is));
+			assertEquals(-1, is.read());
+			assertEquals(0, is.available());
+		}
+		{
+			ChunkedContent c = new ChunkedContent(new InlineContent("a chunk"
+					.getBytes()));
+			InputStream is = c.getInputStream();
+			assertEquals("a chunk", IOUtils.toString(is));
+			assertEquals(-1, is.read());
+			assertEquals(0, is.available());
+		}
 	}
 
 }

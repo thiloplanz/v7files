@@ -50,6 +50,9 @@ public interface ContentStorage {
 
 	/**
 	 * store "out-of-band" content.
+	 * 
+	 * @throws UnsupportedOperationException
+	 *             if the specified scheme is unknown
 	 */
 
 	ContentPointer storeContent(Map<String, Object> storageScheme)
@@ -64,5 +67,12 @@ public interface ContentStorage {
 	 * @return null, if no such content was stored (or the pointer is null)
 	 */
 	Content getContent(ContentPointer pointer) throws IOException;
+
+	/**
+	 * 
+	 * @throws UnsupportedOperationException
+	 *             if the specified scheme is unknown
+	 */
+	Content getContent(Map<String, Object> storageScheme) throws IOException;
 
 }

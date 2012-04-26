@@ -25,6 +25,8 @@ import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import v7db.files.MapUtils;
+
 public final class InlineContent implements Content, ContentPointer {
 
 	private final long length;
@@ -65,6 +67,22 @@ public final class InlineContent implements Content, ContentPointer {
 		System.arraycopy(data, offset, shifted, 0, data.length - offset);
 		System.arraycopy(data, 0, shifted, offset, offset);
 		inlineData = shifted;
+	}
+
+	public static InlineContent deserialize(Map<String, Object> storageSchema) {
+		MapUtils.supportedFields(storageSchema, "in", "length", "offset");
+		byte[] data = (byte[]) storageSchema.get("in");
+		if (data == null) {
+			return new InlineContent(ArrayUtils.EMPTY_BYTE_ARRAY);
+		}
+
+		Long length = MapUtils.getLong(storageSchema, "length");
+		Long offset = MapUtils.getLong(storageSchema, "offset");
+		long l = length != null ? length : data.length;
+		long o = offset != null ? offset : 0l;
+
+		return new InlineContent(data, (int) o, (int) l);
+
 	}
 
 	public long getLength() {

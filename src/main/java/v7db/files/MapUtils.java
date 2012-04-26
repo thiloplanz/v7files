@@ -19,6 +19,7 @@ package v7db.files;
 import static v7db.files.BSONUtils.notNull;
 import static v7db.files.BSONUtils.toLong;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -59,6 +60,14 @@ public class MapUtils {
 		return toLong(getRequired(b, fieldName)).longValue();
 	}
 
+	public static Long getLong(Map<?, ?> b, String fieldName) {
+		return toLong(get(b, fieldName));
+	}
+
+	public static String getString(Map<?, ?> b, String fieldName) {
+		return BSONUtils.toString(get(b, fieldName));
+	}
+
 	public static byte[] getRequiredBytes(Map<?, ?> b, String fieldName) {
 		Object x = getRequired(b, fieldName);
 		if (x == null)
@@ -78,5 +87,36 @@ public class MapUtils {
 		if (x instanceof Object[])
 			return ArrayUtils.clone((Object[]) x);
 		return new Object[] { x };
+	}
+
+	public static void supportedFields(Map<String, ?> o, String... fields) {
+		f: for (String f : o.keySet()) {
+			for (String check : fields) {
+				if (check.equals(f))
+					continue f;
+			}
+			throw new UnsupportedOperationException("only "
+					+ Arrays.toString(fields) + " are supported: " + o);
+		}
+	}
+
+	public static void supportedAndRequiredFields(Map<String, ?> o,
+			String... fields) {
+		for (String f : fields) {
+			if (!o.containsKey(f))
+				throw new UnsupportedOperationException(
+						"missing required field '" + f + "': " + o);
+		}
+		supportedFields(o, fields);
+	}
+
+	@SuppressWarnings("unchecked")
+	public static Map<String, Object> supportJustStringKeys(Map<?, ?> o) {
+		for (Object x : o.keySet()) {
+			if (!(x instanceof String))
+				throw new UnsupportedOperationException(
+						"only string keys are supported, not " + x);
+		}
+		return (Map<String, Object>) o;
 	}
 }

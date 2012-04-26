@@ -16,32 +16,45 @@
  */
 package v7db.files.spi;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.bson.BSONObject;
-
-import v7db.files.BSONUtils;
 import v7db.files.MapUtils;
+
+/**
+ * <pre>
+ * store:  'cat'
+ * base:  one or more chunks
+ * </pre>
+ * 
+ * Each chunk is either a byte array (raw binary data), or a Map representing a
+ * ContentPointer.
+ * 
+ * 
+ */
 
 public class ContentConcatenation implements StorageScheme {
 
-	public Content getContent(ContentStorage storage, Map<String, Object> data) {
+	public Content getContent(ContentStorage storage, Map<String, Object> data)
+			throws IOException {
+
+		MapUtils.supportedAndRequiredFields(data, "base", "store");
+
 		List<Content> chunks = new ArrayList<Content>();
 		for (Object chunk : MapUtils.values(data, "base")) {
 			if (chunk instanceof byte[]) {
 				chunks.add(new InlineContent((byte[]) chunk));
-			} else if (chunk instanceof BSONObject) {
-				BSONObject ch = (BSONObject) chunk;
-				long len = BSONUtils.getRequiredLong(ch, "length");
-				byte[] sha = (byte[]) ch.get("sha");
-				chunks.add(new LazyLoadedContent(storage, new StoredContent(
-						sha, len)));
+			} else if (chunk instanceof Map<?, ?>) {
+				chunks.add(storage.getContent(MapUtils
+						.supportJustStringKeys((Map<?, ?>) chunk)));
 			} else {
 				throw new UnsupportedOperationException("chunk " + chunk);
 			}
 		}
+		if (chunks.size() == 1)
+			return chunks.get(0);
 		return new ChunkedContent(chunks.toArray(new Content[0]));
 	}
 

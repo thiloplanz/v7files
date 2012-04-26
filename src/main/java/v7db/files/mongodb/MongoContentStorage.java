@@ -35,6 +35,7 @@ import org.bson.BSONObject;
 
 import v7db.files.BSONUtils;
 import v7db.files.Compression;
+import v7db.files.MapUtils;
 import v7db.files.ZipFile;
 import v7db.files.spi.Content;
 import v7db.files.spi.ContentConcatenation;
@@ -43,6 +44,7 @@ import v7db.files.spi.ContentSHA;
 import v7db.files.spi.ContentStorage;
 import v7db.files.spi.GzippedContent;
 import v7db.files.spi.InlineContent;
+import v7db.files.spi.OffsetAndLength;
 import v7db.files.spi.StorageScheme;
 import v7db.files.spi.StoredContent;
 
@@ -154,8 +156,7 @@ public class MongoContentStorage implements ContentStorage {
 						+ Hex.encodeHexString(sha));
 
 			if (p.getLength() != base.getLength()) {
-				throw new UnsupportedOperationException(
-						"length, offset not yet implemented");
+				return new OffsetAndLength(base, 0, p.getLength());
 			}
 
 			return base;
@@ -168,12 +169,10 @@ public class MongoContentStorage implements ContentStorage {
 	private Content getContent(BSONObject data) throws IOException {
 		if (data == null)
 			return null;
+		data.removeField("_id");
 		String store = BSONUtils.getString(data, "store");
 		if (store == null || "raw".equals(store)) {
-			byte[] bytes = (byte[]) data.get("in");
-			if (bytes == null)
-				return new InlineContent(ArrayUtils.EMPTY_BYTE_ARRAY);
-			return new InlineContent(bytes);
+			return InlineContent.deserialize(data.toMap());
 		}
 		StorageScheme s = storageSchemes.get(store);
 		if (s != null)
@@ -257,6 +256,42 @@ public class MongoContentStorage implements ContentStorage {
 			contentCollection.insert(x, WriteConcern.SAFE);
 		}
 		return new StoredContent(sha, length);
+	}
+
+	/**
+	 * Supported formats: 1) Serialized ContentPointers, e.g.
+	 * 
+	 * <pre>
+	 * { in: [bytes] }
+	 * </pre>
+	 * 
+	 * and
+	 * 
+	 * <pre>
+	 * { sha: <sha>, length: 123 }
+	 * </pre>
+	 * 
+	 * 2) Internal StorageScheme representations (must have {store: something}")
+	 */
+	public Content getContent(Map<String, Object> data) throws IOException {
+		if (data == null)
+			return null;
+		String store = MapUtils.getString(data, "store");
+		if (store == null || "raw".equals(store)) {
+			if (data.containsKey("in"))
+				return InlineContent.deserialize(data);
+			if (data.containsKey("sha")) {
+				return getContent(new StoredContent((byte[]) data.get("sha"),
+						MapUtils.getRequiredLong(data, "length")));
+			}
+			throw new UnsupportedOperationException(data.toString());
+		}
+
+		StorageScheme s = storageSchemes.get(store);
+		if (s == null)
+			throw new UnsupportedOperationException(store);
+
+		return s.getContent(this, data);
 	}
 
 }
