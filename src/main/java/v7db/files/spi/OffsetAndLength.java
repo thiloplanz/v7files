@@ -19,6 +19,12 @@ package v7db.files.spi;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * Support for "offset" and "length" parameters that can be used to create new
+ * Content by taking a segment of other Content, with optional repetition.
+ * 
+ */
+
 public final class OffsetAndLength implements Content {
 
 	private final Content original;
@@ -38,9 +44,6 @@ public final class OffsetAndLength implements Content {
 	public InputStream getInputStream(long offset, long length)
 			throws IOException {
 		offset += this.offset;
-		if (length + offset > this.length)
-			throw new IOException("length+offset " + length + offset
-					+ " is too long, only have " + this.length);
 		long oLen = original.getLength();
 		if (length + offset <= oLen)
 			return original.getInputStream(offset, length);
@@ -61,14 +64,14 @@ public final class OffsetAndLength implements Content {
 		RepeatedInputStream(long offset, long length) {
 			oLength = original.getLength();
 			remaining = length;
-			ooff = offset;
+			ooff = offset % oLength;
 		}
 
 		@Override
 		public int read() throws IOException {
 			if (remaining > 0) {
 				if (chunk == null) {
-					chunk = original.getInputStream(ooff, oLength);
+					chunk = original.getInputStream(ooff, oLength - ooff);
 					ooff = 0;
 				}
 

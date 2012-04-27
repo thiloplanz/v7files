@@ -30,6 +30,17 @@ public class OffsetAndLengthTest extends TestCase {
 				.getBytes()), 0, 10);
 
 		assertEquals("abcdeabcde", IOUtils.toString(doubled.getInputStream()));
+		assertEquals("cdeabc", IOUtils.toString(doubled.getInputStream(2, 6)));
+		assertEquals(10l, doubled.getLength());
+	}
+
+	public void testContentRepetitionWithOffset() throws IOException {
+
+		Content doubled = new OffsetAndLength(new InlineContent("abcde"
+				.getBytes()), 3, 10);
+
+		assertEquals("deabcdeabc", IOUtils.toString(doubled.getInputStream()));
+		assertEquals("eabcde", IOUtils.toString(doubled.getInputStream(1, 6)));
 		assertEquals(10l, doubled.getLength());
 	}
 }

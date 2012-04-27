@@ -24,11 +24,29 @@ import org.apache.commons.io.IOUtils;
 
 public class InlineContentTest extends TestCase {
 
+	public void testInlineContent() throws IOException {
+		assertInlineContent("abcd", new InlineContent("abcd".getBytes()));
+
+	}
+
 	public void testContentRepetition() throws IOException {
-
 		Content doubled = new InlineContent("abcde".getBytes(), 0, 10);
+		assertInlineContent("abcdeabcde", doubled);
+	}
 
-		assertEquals("abcdeabcde", IOUtils.toString(doubled.getInputStream()));
-		assertEquals(10l, doubled.getLength());
+	public void testContentRepetitionWithOffset() throws IOException {
+		Content doubled = new InlineContent("abcde".getBytes(), 2, 10);
+		assertInlineContent("cdeabcdeab", doubled);
+	}
+
+	private void assertInlineContent(String content, Content inlineContent)
+			throws IOException {
+		assertNotNull(inlineContent);
+		assertEquals(content, IOUtils.toString(inlineContent.getInputStream()));
+		assertEquals(content.length(), inlineContent.getLength());
+		assertEquals(content.substring(1, content.length() - 1),
+				IOUtils.toString(inlineContent.getInputStream(1, content
+						.length() - 2)));
+
 	}
 }

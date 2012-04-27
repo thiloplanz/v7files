@@ -65,7 +65,7 @@ public final class InlineContent implements Content, ContentPointer {
 		}
 		byte[] shifted = new byte[data.length];
 		System.arraycopy(data, offset, shifted, 0, data.length - offset);
-		System.arraycopy(data, 0, shifted, offset, offset);
+		System.arraycopy(data, 0, shifted, offset + 1, offset);
 		inlineData = shifted;
 	}
 
