@@ -59,7 +59,7 @@ public class V7GridFS {
 	public V7File getFile(String... path) {
 
 		// the filesystem root
-		V7File parentFile = V7File.lazy(this, path[0]);
+		V7File parentFile = V7File.lazy(this, path[0], null);
 
 		if (path.length == 1) {
 			return parentFile;
@@ -90,8 +90,9 @@ public class V7GridFS {
 					if (parent.equals(c.get("parent"))
 							&& fileName.equals(c.get("filename"))) {
 						parent = c.get("_id");
-						metaData = c;
 						parentFile = new V7File(this, metaData, parentFile);
+						metaData = c;
+
 						continue path;
 					}
 				}
@@ -112,7 +113,20 @@ public class V7GridFS {
 	 * @return
 	 * @throws IOException
 	 */
-	public Object addFile(byte[] data, Object parentFileId, String filename,
+	public ObjectId addFolder(Object parentFileId, String filename)
+			throws IOException {
+		return addFile(null, 0, 0, parentFileId, filename, null);
+	}
+
+	/**
+	 * @param data
+	 *            can be null, for a file without content (e.g. a folder)
+	 * @param parentFileId
+	 * @param filename
+	 * @return
+	 * @throws IOException
+	 */
+	public ObjectId addFile(byte[] data, Object parentFileId, String filename,
 			String contentType) throws IOException {
 		if (data == null)
 			return addFile(null, 0, 0, parentFileId, filename, contentType);
@@ -120,7 +134,7 @@ public class V7GridFS {
 				contentType);
 	}
 
-	public Object addFile(byte[] data, int offset, int len,
+	public ObjectId addFile(byte[] data, int offset, int len,
 			Object parentFileId, String filename, String contentType)
 			throws IOException {
 
@@ -135,7 +149,7 @@ public class V7GridFS {
 		return fileId;
 	}
 
-	public Object addFile(File data, Object parentFileId, String filename,
+	public ObjectId addFile(File data, Object parentFileId, String filename,
 			String contentType) throws IOException {
 		// avoid temporary files for small data
 		if (data != null && data.length() < 32 * 1024) {
@@ -151,7 +165,7 @@ public class V7GridFS {
 				filename, contentType));
 
 		insertMetaData(metaData);
-		return metaData.get("_id");
+		return fileId;
 	}
 
 	public List<V7File> getChildren(V7File parent) {

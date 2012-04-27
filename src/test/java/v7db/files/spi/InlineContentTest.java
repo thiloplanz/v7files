@@ -39,6 +39,21 @@ public class InlineContentTest extends TestCase {
 		assertInlineContent("cdeabcdeab", doubled);
 	}
 
+	public void testContentEquals() {
+		ContentPointer abc = new InlineContent("abc".getBytes());
+
+		assertTrue(abc.contentEquals(abc));
+		assertTrue(abc.contentEquals(new InlineContent("abc".getBytes())));
+		ContentSHA sha = ContentSHA.calculate("abc".getBytes());
+		assertTrue(abc.contentEquals(sha));
+		assertTrue(abc.contentEquals(new StoredContent(sha.getSHA(), abc
+				.getLength())));
+
+		assertFalse(abc.contentEquals(null));
+		assertFalse(abc.contentEquals(new InlineContent("abcd".getBytes())));
+		assertFalse(abc.contentEquals(ContentSHA.calculate("xyz".getBytes())));
+	}
+
 	private void assertInlineContent(String content, Content inlineContent)
 			throws IOException {
 		assertNotNull(inlineContent);
@@ -47,6 +62,6 @@ public class InlineContentTest extends TestCase {
 		assertEquals(content.substring(1, content.length() - 1),
 				IOUtils.toString(inlineContent.getInputStream(1, content
 						.length() - 2)));
-
 	}
+
 }

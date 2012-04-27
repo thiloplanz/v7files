@@ -25,6 +25,7 @@ import jmockmongo.MockMongoTestCaseSupport;
 
 import org.apache.commons.io.IOUtils;
 import org.bson.BasicBSONObject;
+import org.bson.types.ObjectId;
 
 public class V7GridFSTest extends MockMongoTestCaseSupport {
 
@@ -46,6 +47,8 @@ public class V7GridFSTest extends MockMongoTestCaseSupport {
 
 	private void testSimpleScenario(byte[] fileData) throws IOException {
 
+		// insert
+
 		gridFS.addFile(fileData, "root", "test.dat", "text/plain");
 		V7File file = gridFS.getFile("root", "test.dat");
 		assertEquals("test.dat", file.getName());
@@ -61,6 +64,21 @@ public class V7GridFSTest extends MockMongoTestCaseSupport {
 		List<V7File> files = root.getChildren();
 		assertEquals(1, files.size());
 
+		// update
+		// TODO: jmockmongo needs findAndModify first
+
+		// file.setContent("updated contents".getBytes(), "text/plain");
+		//
+		// file = gridFS.getFile("root", "test.dat");
+		// assertEquals("test.dat", file.getName());
+		// assertEquals("text/plain", file.getContentType());
+		// assertEquals("updated contents", IOUtils
+		// .toString(file.getInputStream()));
+
+		// delete
+		file.delete();
+		assertNull(gridFS.getFile("root", "test.dat"));
+
 	}
 
 	public void testSimpleScenario_ShortFile() throws IOException {
@@ -71,5 +89,21 @@ public class V7GridFSTest extends MockMongoTestCaseSupport {
 		byte[] bytes = new byte[1000000];
 		new Random(12345).nextBytes(bytes);
 		testSimpleScenario(bytes);
+	}
+
+	public void testFolder() throws IOException {
+		ObjectId folderId = gridFS.addFolder("root", "foolder");
+		V7File folder = gridFS.getFile("root", "foolder");
+		assertEquals("foolder", folder.getName());
+		assertEquals(folderId, folder.getId());
+		assertEquals(false, folder.hasContent());
+
+		V7File file = folder.createChild("a file in there".getBytes(),
+				"file.txt", "text/plain");
+		assertEquals(folder.getId(), file.getParentId());
+		V7File checkFile = gridFS.getFile("root", "foolder", "file.txt");
+		assertEquals(file.getId(), checkFile.getId());
+		assertEquals(folder.getId(), checkFile.getParentId());
+
 	}
 }

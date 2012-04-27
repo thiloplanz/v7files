@@ -30,16 +30,6 @@ public final class ContentSHA implements ContentPointer {
 
 	private final Long length;
 
-	/**
-	 * use a SHA digest to point at stored content (of unknown length)
-	 * 
-	 * @param sha
-	 */
-	public ContentSHA(byte[] sha) {
-		this.sha = sha.clone();
-		length = null;
-	}
-
 	private ContentSHA(byte[] sha, long length) {
 		this.sha = sha;
 		this.length = length;

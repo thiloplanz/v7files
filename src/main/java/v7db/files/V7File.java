@@ -17,13 +17,11 @@
 
 package v7db.files;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
 
@@ -39,9 +37,7 @@ import v7db.files.spi.ContentSHA;
 import v7db.files.spi.InlineContent;
 
 import com.mongodb.BasicDBObject;
-import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
-import com.mongodb.WriteResult;
 
 public class V7File {
 
@@ -60,8 +56,8 @@ public class V7File {
 		this.parent = parent;
 	}
 
-	static V7File lazy(V7GridFS gridFS, Object id) {
-		return new V7File(gridFS, new BasicDBObject("_id", id), null);
+	static V7File lazy(V7GridFS gridFS, Object id, V7File parent) {
+		return new V7File(gridFS, new BasicDBObject("_id", id), parent);
 	}
 
 	private void loadGridFile() throws IOException {
@@ -88,20 +84,6 @@ public class V7File {
 
 	public int getVersion() {
 		return BSONUtils.getRequiredInt(metaData, "_version");
-	}
-
-	WriteResult updateThisVersion(DBCollection collection, DBObject update)
-			throws IOException {
-		DBObject find = new BasicDBObject("_id", metaData.get("_id")).append(
-				"_version", metaData.get("_version"));
-		WriteResult r = collection.update(find, update);
-		if (r.getError() != null)
-			throw new IOException(r.getError());
-		if (r.getN() == 0)
-			throw new ConcurrentModificationException("version " + getVersion()
-					+ " is no longer the current version for file " + getId()
-					+ " (" + getName() + ")");
-		return r;
 	}
 
 	public V7File getParent() {
@@ -161,32 +143,6 @@ public class V7File {
 
 	}
 
-	InputStream getInputStream(Integer _off, Integer _len) throws IOException {
-		InputStream in = getInputStream();
-		if (in == null)
-			return null;
-		int off = 0;
-		if (_off != null)
-			off = _off.intValue();
-		if (off == 0 && _len == null)
-			return in;
-
-		// TODO: better implementation
-		if (off > 0)
-			IOUtils.skipFully(in, off);
-
-		if (_len == null)
-			return in;
-
-		int len = _len.intValue();
-		byte[] data = new byte[len];
-		int read = V7GridFS.readFully(in, data);
-		if (read < len)
-			throw new IOException("not enough data to read from " + getName()
-					+ ", off: " + off + " len: " + len);
-		return new ByteArrayInputStream(data);
-	}
-
 	public boolean hasContent() {
 		return gridFS.getContentPointer(metaData) != null;
 	}
@@ -227,20 +183,20 @@ public class V7File {
 	public V7File createChild(byte[] data, String filename, String contentType)
 			throws IOException {
 		Object childId = gridFS.addFile(data, getId(), filename, contentType);
-		return lazy(gridFS, childId);
+		return lazy(gridFS, childId, this);
 	}
 
 	public V7File createChild(byte[] data, int offset, int len,
 			String filename, String contentType) throws IOException {
 		Object childId = gridFS.addFile(data, offset, len, getId(), filename,
 				contentType);
-		return lazy(gridFS, childId);
+		return lazy(gridFS, childId, this);
 	};
 
 	public V7File createChild(File data, String filename, String contentType)
 			throws IOException {
 		Object childId = gridFS.addFile(data, getId(), filename, contentType);
-		return lazy(gridFS, childId);
+		return lazy(gridFS, childId, this);
 	}
 
 	public V7File createChild(InputStream data, long size, String filename,
