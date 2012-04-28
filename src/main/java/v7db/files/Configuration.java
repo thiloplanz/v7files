@@ -33,6 +33,7 @@ import org.apache.log4j.PropertyConfigurator;
 
 import com.mongodb.Mongo;
 import com.mongodb.MongoException;
+import com.mongodb.MongoURI;
 
 public class Configuration {
 
@@ -112,7 +113,13 @@ public class Configuration {
 
 	public static final Mongo getMongo() throws UnknownHostException,
 			MongoException {
-		Mongo mongo = new Mongo();
+		return getMongo(props);
+	}
+
+	public static final Mongo getMongo(Properties props)
+			throws UnknownHostException, MongoException {
+		MongoURI uri = new MongoURI(props.getProperty("db.uri"));
+		Mongo mongo = new Mongo(uri);
 		return mongo;
 	}
 
