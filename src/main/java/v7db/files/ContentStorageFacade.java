@@ -47,8 +47,6 @@ public class ContentStorageFacade {
 
 	private final ReferenceTracking refTracking;
 
-	private final int inlineUntil = 100;
-
 	public ContentStorageFacade(ContentStorage storage,
 			ReferenceTracking refTracking) {
 		this.storage = storage;
@@ -106,9 +104,8 @@ public class ContentStorageFacade {
 
 		}
 
-		ContentPointer p = (len <= inlineUntil) ? new InlineContent(data,
-				offset, len) : storage.storeContent(new ByteArrayInputStream(
-				data, offset, len));
+		ContentPointer p = storage.storeContent(new ByteArrayInputStream(data,
+				offset, len));
 
 		refTracking.updateReferences(fileId, p);
 
@@ -123,16 +120,6 @@ public class ContentStorageFacade {
 			return insertContentsAndBackRefs(null, 0, 0, fileId, filename,
 					contentType);
 
-		long len = data.length();
-		if (data.length() <= inlineUntil) {
-			return insertContentsAndBackRefs(FileUtils
-					.readFileToByteArray(data), 0, (int) len, fileId, filename,
-					contentType);
-		}
-
-		if (data == null)
-			return makeMetaData(filename, contentType, null);
-
 		ContentPointer p = storage.storeContent(new FileInputStream(data));
 
 		refTracking.updateReferences(fileId, p);
@@ -144,6 +131,11 @@ public class ContentStorageFacade {
 	public BSONObject inlineOrInsertContentsAndBackRefs(int inlineUntil,
 			byte[] data, ObjectId fileId, String filename, String contentType)
 			throws IOException {
+
+		if (data == null)
+			return insertContentsAndBackRefs(null, 0, 0, fileId, filename,
+					contentType);
+
 		if (data.length > inlineUntil)
 			return insertContentsAndBackRefs(data, 0, data.length, fileId,
 					filename, contentType);
@@ -153,11 +145,27 @@ public class ContentStorageFacade {
 	}
 
 	public BSONObject inlineOrInsertContentsAndBackRefs(int inlineUntil,
+			byte[] data, int offset, int length, Object fileId,
+			String filename, String contentType) throws IOException {
+		if (data == null || length > inlineUntil)
+			return insertContentsAndBackRefs(data, offset, length, fileId,
+					filename, contentType);
+
+		refTracking.updateReferences(fileId);
+
+		return makeMetaData(filename, contentType, new InlineContent(data,
+				offset, length));
+
+	}
+
+	public BSONObject inlineOrInsertContentsAndBackRefs(int inlineUntil,
 			File data, ObjectId fileId, String filename, String contentType)
 			throws IOException {
-		if (data.length() > inlineUntil)
+		if (data == null || data.length() > inlineUntil)
 			return insertContentsAndBackRefs(data, fileId, filename,
 					contentType);
+
+		refTracking.updateReferences(fileId);
 
 		return makeMetaData(filename, contentType, new InlineContent(FileUtils
 				.readFileToByteArray(data)));

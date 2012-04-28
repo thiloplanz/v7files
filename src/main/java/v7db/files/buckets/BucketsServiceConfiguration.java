@@ -46,7 +46,7 @@ public class BucketsServiceConfiguration {
 	}
 
 	public void init() throws UnknownHostException, MongoException {
-		Mongo mongo = Configuration.getMongo();
+		Mongo mongo = Configuration.getMongo(properties);
 		db = mongo.getDB(Tenants.getTenantDbName(mongo, properties, null));
 	}
 

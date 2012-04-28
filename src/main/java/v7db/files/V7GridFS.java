@@ -142,8 +142,8 @@ public class V7GridFS {
 		BasicDBObject metaData = new BasicDBObject("parent", parentFileId)
 				.append("_id", fileId);
 
-		metaData.putAll(storage.insertContentsAndBackRefs(data, offset, len,
-				fileId, filename, contentType));
+		metaData.putAll(storage.inlineOrInsertContentsAndBackRefs(100, data,
+				offset, len, fileId, filename, contentType));
 
 		insertMetaData(metaData);
 		return fileId;
@@ -312,8 +312,8 @@ public class V7GridFS {
 		// takes less space than just storing the SHA-1 and length
 		// 20 (SHA-1) + 1 (sha - in) + 6 (length) + 4 (int32) + 2*12
 		// (ObjectId back-references)
-		BSONObject newContent = storage.insertContentsAndBackRefs(contents,
-				offset, len, fileId, filename, contentType);
+		BSONObject newContent = storage.inlineOrInsertContentsAndBackRefs(55,
+				contents, offset, len, fileId, filename, contentType);
 
 		// check if it has changed
 		ContentPointer newContents = getContentPointer(newContent);

@@ -5,7 +5,7 @@
 	<artifactId>v7files</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>V7Files</name>
-	<description>WebDAV server backed by the MongoDB GridFS</description>
+	<description>WebDAV server backed by MongoDB</description>
 	<licenses>
 		<license>
 			<name>GNU Affero General Public License v3</name>
@@ -218,6 +218,13 @@
 			<groupId>jmockmongo</groupId>
 			<artifactId>jmockmongo</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>httpunit</groupId>
+			<artifactId>httpunit</artifactId>
+			<version>1.7</version>
+			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011-2012, Thilo Planz. All rights reserved.
+ * Copyright (c) 2012, Thilo Planz. All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,6 +51,7 @@ import org.bson.types.ObjectId;
 import v7db.files.BSONUtils;
 import v7db.files.ContentStorageFacade;
 import v7db.files.spi.Content;
+import v7db.files.spi.InlineContent;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
@@ -248,7 +249,6 @@ public class BucketsServlet extends HttpServlet {
 			throws IOException {
 
 		BSONObject file = null;
-		Content content = null;
 
 		data: for (Object o : BSONUtils.values(bucket, "FormPost.data")) {
 			BSONObject upload = (BSONObject) o;
@@ -270,6 +270,19 @@ public class BucketsServlet extends HttpServlet {
 					+ bucket.get("_id")
 					+ "' does not have a file matching digest '"
 					+ Hex.encodeHexString(sha) + "'");
+			return;
+		}
+
+		Content content = storage.getContent(sha);
+		if (content == null) {
+			response
+					.sendError(
+							HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+							"Bucket '"
+									+ bucket.get("_id")
+									+ "' has a file matching digest '"
+									+ Hex.encodeHexString(sha)
+									+ "', but it could not be found in the content storage");
 			return;
 		}
 
@@ -370,6 +383,10 @@ public class BucketsServlet extends HttpServlet {
 					new DBRef(null, bucketCollection.getName(), bucket
 							.get("_id")), null, null);
 			sha = (byte[]) content.get("sha");
+			if (sha == null) {
+				sha = ((InlineContent) storage.getContentPointer(content))
+						.getSHA();
+			}
 		} finally {
 			tempFile.delete();
 		}

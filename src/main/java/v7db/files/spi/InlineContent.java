@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 
 import v7db.files.MapUtils;
@@ -32,6 +34,8 @@ public final class InlineContent implements Content, ContentPointer {
 	private final long length;
 
 	private final byte[] inlineData;
+
+	private byte[] sha;
 
 	public InlineContent(byte[] data) {
 		inlineData = ArrayUtils.clone(data);
@@ -156,6 +160,24 @@ public final class InlineContent implements Content, ContentPointer {
 		if (otherContent == null || otherContent.getLength() != length)
 			return false;
 		return otherContent.contentEquals(this);
+	}
+
+	public byte[] getSHA() {
+		if (sha != null)
+			return sha.clone();
+		try {
+			sha = DigestUtils.sha(getInputStream());
+			return sha.clone();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	/**
+	 * @return the hex-encoded SHA
+	 */
+	public String getDigest() {
+		return Hex.encodeHexString(getSHA());
 	}
 
 }

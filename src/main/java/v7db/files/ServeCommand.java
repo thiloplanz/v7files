@@ -58,7 +58,7 @@ class ServeCommand {
 
 		}
 
-		// FormPost
+		// Buckets
 
 		{
 			String[] endpoints = Configuration
