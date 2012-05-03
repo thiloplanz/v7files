@@ -26,7 +26,10 @@ public class InlineContentTest extends TestCase {
 
 	public void testInlineContent() throws IOException {
 		assertInlineContent("abcd", new InlineContent("abcd".getBytes()));
+	}
 
+	public void testEmpty() throws IOException {
+		assertInlineContent("", new InlineContent("".getBytes()));
 	}
 
 	public void testContentRepetition() throws IOException {
@@ -59,9 +62,10 @@ public class InlineContentTest extends TestCase {
 		assertNotNull(inlineContent);
 		assertEquals(content, IOUtils.toString(inlineContent.getInputStream()));
 		assertEquals(content.length(), inlineContent.getLength());
-		assertEquals(content.substring(1, content.length() - 1),
-				IOUtils.toString(inlineContent.getInputStream(1, content
-						.length() - 2)));
+		if (content.length() > 2)
+			assertEquals(content.substring(1, content.length() - 1), IOUtils
+					.toString(inlineContent.getInputStream(1,
+							content.length() - 2)));
 	}
 
 }

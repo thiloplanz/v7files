@@ -62,8 +62,14 @@ public class MiltonServlet extends com.bradmcevoy.http.MiltonServlet {
 			super.service(servletRequest, servletResponse);
 		} finally {
 			long taken = System.nanoTime() - time;
-			log.info("request took " + taken / (1000 * 1000) + " ms, status "
-					+ s.getStatus());
+			try {
+				log.info("request took " + taken / (1000 * 1000)
+						+ " ms, status " + s.getStatus());
+			} catch (Throwable e) {
+				// httpunit does not implement getStatus() (@since Servlet API
+				// 3.0 )
+				log.info("request took " + taken / (1000 * 1000) + " ms");
+			}
 			MDC.clear();
 		}
 	}

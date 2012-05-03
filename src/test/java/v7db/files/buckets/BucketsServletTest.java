@@ -18,18 +18,16 @@ package v7db.files.buckets;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Properties;
 
 import javax.servlet.http.HttpServletResponse;
 
-import jmockmongo.MockMongo;
 import jmockmongo.MockMongoTestCaseSupport;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bson.BasicBSONObject;
 import org.xml.sax.SAXException;
 
-import v7db.files.Main;
+import v7db.files.UnitTestSupport;
 import v7db.files.mongodb.MongoContentStorage;
 import v7db.files.spi.ContentSHA;
 
@@ -46,22 +44,11 @@ public class BucketsServletTest extends MockMongoTestCaseSupport {
 
 	private ServletRunner sr;
 
-	private static final Properties defaultProps = new Properties();
-	static {
-		try {
-			defaultProps.load(Main.class
-					.getResourceAsStream("defaults.properties"));
-			defaultProps.put("db.uri", MockMongo.DEFAULT_URI.toString());
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
-
 	public static class TestBucketsServlet extends BucketsServlet {
 		private static final long serialVersionUID = 1L;
 
 		public TestBucketsServlet() {
-			super(defaultProps);
+			super(UnitTestSupport.getDefaultProperties());
 		}
 
 	}

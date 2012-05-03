@@ -38,8 +38,7 @@ public final class InlineContent implements Content, ContentPointer {
 	private byte[] sha;
 
 	public InlineContent(byte[] data) {
-		inlineData = ArrayUtils.clone(data);
-		length = inlineData.length;
+		this(data, 0, data.length);
 	}
 
 	/**
@@ -62,6 +61,10 @@ public final class InlineContent implements Content, ContentPointer {
 	 */
 	public InlineContent(byte[] data, int offset, int length) {
 		this.length = length;
+		if (length == 0) {
+			inlineData = ArrayUtils.EMPTY_BYTE_ARRAY;
+			return;
+		}
 		offset %= data.length;
 		if (offset == 0) {
 			inlineData = Arrays.copyOf(data, Math.min(data.length, length));
