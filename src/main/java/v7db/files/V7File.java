@@ -135,6 +135,8 @@ public class V7File {
 	public InputStream getInputStream() throws IOException {
 		loadGridFile();
 
+		if (gridFile == null)
+			return null;
 		try {
 			return gridFile.getInputStream();
 		} catch (IllegalArgumentException e) {

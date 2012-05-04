@@ -25,6 +25,7 @@ import java.util.List;
 import v7db.files.V7File;
 
 import com.bradmcevoy.http.CollectionResource;
+import com.bradmcevoy.http.CopyableResource;
 import com.bradmcevoy.http.MakeCollectionableResource;
 import com.bradmcevoy.http.PutableResource;
 import com.bradmcevoy.http.Resource;
@@ -101,5 +102,19 @@ public class FolderResource extends FileResource implements CollectionResource,
 		if (child.hasContent())
 			return new FileResource(child, factory);
 		return new FolderResource(child, factory);
+	}
+
+	@Override
+	public void copyTo(CollectionResource to, String name)
+			throws NotAuthorizedException, BadRequestException,
+			ConflictException {
+		FolderResource newParent = (FolderResource) to;
+		Resource existing = newParent.child(name);
+		if (existing != null)
+			throw new ConflictException();
+		FolderResource copy = (FolderResource) newParent.createCollection(name);
+		for (Resource child : getChildren()) {
+			((CopyableResource) child).copyTo(copy, child.getName());
+		}
 	}
 }

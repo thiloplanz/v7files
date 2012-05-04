@@ -170,7 +170,6 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 		case POST:
 		case PUT:
 		case MKCOL:
-		case MOVE:
 		case DELETE:
 		case LOCK:
 			return authorisation.authoriseWrite(file, tag);
@@ -178,8 +177,18 @@ class ResourceFactory implements com.bradmcevoy.http.ResourceFactory, Initable {
 			// unlock only works if you have the lock token, so no extra
 			// authorisation required
 			return true;
+
+		case MOVE:
+			// TODO: also need to check write permissions in the target
+			// directory
+			return authorisation.authoriseWrite(file, tag);
+		case COPY:
+			// TODO: also need to check write permissions in the target
+			// directory
+			return authorisation.authoriseRead(file, tag);
 		default:
-			System.err.println("acl not implemented for " + method);
+			System.err.println("acl not implemented for " + method + " on "
+					+ file.getName());
 			return false;
 		}
 

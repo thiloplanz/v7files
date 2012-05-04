@@ -80,11 +80,16 @@ public class MiltonServletTest extends MockMongoTestCaseSupport {
 			WebResponse resp = sc.getResponse(request);
 			assertEquals(HttpServletResponse.SC_CREATED, resp.getResponseCode());
 		}
+		assertExists(sc, "http://test/myServlet/1/test.txt");
+
+		// TODO: MOVE needs more update support from jMockMongo
+
 		{
-			WebRequest request = new GetMethodWebRequest(
-					"http://test/myServlet//1/test.txt");
-			WebResponse resp = sc.getResponse(request);
-			assertEquals(HttpServletResponse.SC_OK, resp.getResponseCode());
+			WebRequest request = new MoveWebRequest("http://test/myServlet/1",
+					"/myServlet/2");
+			// WebResponse resp = sc.getResponse(request);
+			// assertEquals(HttpServletResponse.SC_CREATED,
+			// resp.getResponseCode());
 		}
 
 	}
@@ -107,12 +112,70 @@ public class MiltonServletTest extends MockMongoTestCaseSupport {
 				new ObjectId()).append("filename", "a.txt").append("parent",
 				"webdav").append("in", "abcd".getBytes()));
 
-		{
-			WebRequest request = new GetMethodWebRequest(
-					"http://test/myServlet/a.txt");
-			WebResponse resp = sc.getResponse(request);
-			assertEquals("abcd", resp.getText());
-			assertEquals(HttpServletResponse.SC_OK, resp.getResponseCode());
-		}
+		assertGET(sc, "http://test/myServlet/a.txt", "abcd");
+
 	}
+
+	private void assertExists(ServletUnitClient sc, String url)
+			throws IOException, SAXException {
+		WebRequest request = new GetMethodWebRequest(url);
+		WebResponse resp = sc.getResponse(request);
+		assertEquals(HttpServletResponse.SC_OK, resp.getResponseCode());
+	}
+
+	private void assertGET(ServletUnitClient sc, String url, String contents)
+			throws IOException, SAXException {
+		WebRequest request = new GetMethodWebRequest(url);
+		WebResponse resp = sc.getResponse(request);
+		assertEquals(contents, resp.getText());
+		assertEquals(HttpServletResponse.SC_OK, resp.getResponseCode());
+	}
+
+	public void testCOPYFile() throws IOException, SAXException {
+		ServletUnitClient sc = sr.newClient();
+		sc.setAuthentication("V7Files", "admin", "admin");
+
+		prepareMockData("test.v7files.files", new BasicBSONObject("_id",
+				new ObjectId()).append("filename", "a.txt").append("parent",
+				"webdav").append("in", "abcd".getBytes()));
+
+		{
+			WebRequest request = new CopyWebRequest(
+					"http://test/myServlet/a.txt", "/myServlet/b.txt");
+			WebResponse resp = sc.getResponse(request);
+			assertEquals(HttpServletResponse.SC_CREATED, resp.getResponseCode());
+		}
+		assertGET(sc, "http://test/myServlet/a.txt", "abcd");
+		assertGET(sc, "http://test/myServlet/b.txt", "abcd");
+
+	}
+
+	public void testCOPYFolder() throws IOException, SAXException {
+		ServletUnitClient sc = sr.newClient();
+		sc.setAuthentication("V7Files", "admin", "admin");
+
+		{
+			WebRequest request = new MkColWebRequest("http://test/myServlet/1");
+			WebResponse resp = sc.getResponse(request);
+			assertEquals(HttpServletResponse.SC_CREATED, resp.getResponseCode());
+		}
+
+		{
+			WebRequest request = new PutMethodWebRequest(
+					"http://test/myServlet/1/test.txt",
+					new ByteArrayInputStream("testPUT".getBytes()),
+					"text/plain");
+			WebResponse resp = sc.getResponse(request);
+			assertEquals(HttpServletResponse.SC_CREATED, resp.getResponseCode());
+		}
+
+		{
+			WebRequest request = new CopyWebRequest("http://test/myServlet/1",
+					"/myServlet/2");
+			WebResponse resp = sc.getResponse(request);
+			assertEquals(HttpServletResponse.SC_CREATED, resp.getResponseCode());
+		}
+		assertExists(sc, "http://test/myServlet/2/test.txt");
+	}
+
 }

@@ -30,6 +30,7 @@ import v7db.files.V7File;
 
 import com.bradmcevoy.http.Auth;
 import com.bradmcevoy.http.CollectionResource;
+import com.bradmcevoy.http.CopyableResource;
 import com.bradmcevoy.http.DeletableResource;
 import com.bradmcevoy.http.GetableResource;
 import com.bradmcevoy.http.HttpManager;
@@ -37,6 +38,7 @@ import com.bradmcevoy.http.MoveableResource;
 import com.bradmcevoy.http.PropFindableResource;
 import com.bradmcevoy.http.Range;
 import com.bradmcevoy.http.Request;
+import com.bradmcevoy.http.Resource;
 import com.bradmcevoy.http.Response;
 import com.bradmcevoy.http.Request.Method;
 import com.bradmcevoy.http.exceptions.BadRequestException;
@@ -45,7 +47,7 @@ import com.bradmcevoy.http.exceptions.NotAuthorizedException;
 import com.bradmcevoy.http.exceptions.NotFoundException;
 
 class FileResource implements GetableResource, PropFindableResource,
-		MoveableResource, DeletableResource {
+		MoveableResource, DeletableResource, CopyableResource {
 
 	final V7File file;
 
@@ -163,9 +165,27 @@ class FileResource implements GetableResource, PropFindableResource,
 		try {
 			file.delete();
 		} catch (IOException e) {
-			System.err.println();
+			e.printStackTrace();
 			throw new ConflictException(this);
 		}
+	}
+
+	public void copyTo(CollectionResource to, String name)
+			throws NotAuthorizedException, BadRequestException,
+			ConflictException {
+		FolderResource newParent = (FolderResource) to;
+		Resource existing = newParent.child(name);
+		if (existing != null)
+			throw new ConflictException();
+		try {
+			// TODO: avoid copying the data, just copy the ContentPointer
+			newParent.createNew(name, file.getInputStream(), file.getLength(),
+					file.getContentType());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new ConflictException(this);
+		}
+
 	}
 
 }
