@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import v7db.files.V7File;
+import v7db.files.spi.ContentPointer;
 
 import com.bradmcevoy.http.CollectionResource;
 import com.bradmcevoy.http.CopyableResource;
@@ -80,6 +81,24 @@ public class FolderResource extends FileResource implements CollectionResource,
 		else
 			((FileResource) existingChild).file.setContent(inputStream,
 					contentType);
+		return existingChild;
+	}
+
+	Resource createNew(String newName, ContentPointer content,
+			String contentType) throws IOException, ConflictException {
+		Resource existingChild = child(newName);
+		if (existingChild == null) {
+
+			V7File child = file.createChild(content, newName, contentType);
+
+			return new FileResource(child, factory);
+		}
+		if (existingChild instanceof FolderResource) {
+			throw new ConflictException(existingChild,
+					"already exists and is a folder");
+		}
+
+		((FileResource) existingChild).file.setContent(content, contentType);
 		return existingChild;
 	}
 

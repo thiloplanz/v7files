@@ -18,6 +18,7 @@ package v7db.files.milton;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Date;
 import java.util.Hashtable;
 import java.util.Properties;
 
@@ -110,9 +111,22 @@ public class MiltonServletTest extends MockMongoTestCaseSupport {
 
 		prepareMockData("test.v7files.files", new BasicBSONObject("_id",
 				new ObjectId()).append("filename", "a.txt").append("parent",
-				"webdav").append("in", "abcd".getBytes()));
+				"webdav").append("created_at", new Date()).append("in",
+				"abcd".getBytes()));
 
 		assertGET(sc, "http://test/myServlet/a.txt", "abcd");
+
+		{
+			WebRequest request = new GetMethodWebRequest(
+					"http://test/myServlet/a.txt");
+			WebResponse resp = sc.getResponse(request);
+			String eTag = resp.getHeaderField("Etag");
+			request.setHeaderField("If-None-Match", eTag);
+			resp = sc.getResponse(request);
+			assertEquals(HttpServletResponse.SC_NOT_MODIFIED, resp
+					.getResponseCode());
+			assertEquals("", resp.getText());
+		}
 
 	}
 

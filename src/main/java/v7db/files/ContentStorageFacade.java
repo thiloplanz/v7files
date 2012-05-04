@@ -172,4 +172,10 @@ public class ContentStorageFacade {
 
 	}
 
+	public BSONObject updateBackRefs(ContentPointer content, Object fileId,
+			String filename, String contentType) throws IOException {
+		refTracking.updateReferences(fileId, content);
+		return makeMetaData(filename, contentType, content);
+	}
+
 }

@@ -145,19 +145,23 @@ public class V7File {
 
 	}
 
+	public ContentPointer getContentPointer() {
+		return gridFS.getContentPointer(metaData);
+	}
+
 	public boolean hasContent() {
-		return gridFS.getContentPointer(metaData) != null;
+		return getContentPointer() != null;
 	}
 
 	public Long getLength() {
-		ContentPointer p = gridFS.getContentPointer(metaData);
+		ContentPointer p = getContentPointer();
 		if (p == null)
 			return null;
 		return p.getLength();
 	}
 
 	public String getDigest() {
-		ContentPointer contentPointer = gridFS.getContentPointer(metaData);
+		ContentPointer contentPointer = getContentPointer();
 		if (contentPointer instanceof ContentSHA) {
 			return ((ContentSHA) contentPointer).getDigest();
 		}
@@ -184,6 +188,12 @@ public class V7File {
 
 	public V7File createChild(byte[] data, String filename, String contentType)
 			throws IOException {
+		Object childId = gridFS.addFile(data, getId(), filename, contentType);
+		return lazy(gridFS, childId, this);
+	}
+
+	public V7File createChild(ContentPointer data, String filename,
+			String contentType) throws IOException {
 		Object childId = gridFS.addFile(data, getId(), filename, contentType);
 		return lazy(gridFS, childId, this);
 	}
@@ -258,6 +268,12 @@ public class V7File {
 	public void moveTo(Object newParentId, String newName) throws IOException {
 		metaData.put("parent", newParentId);
 		rename(newName);
+	}
+
+	public void setContent(ContentPointer data, String contentType)
+			throws IOException {
+		metaData.put("contentType", contentType);
+		gridFS.updateContents(metaData, data);
 	}
 
 	public void setContent(byte[] data, String contentType) throws IOException {

@@ -134,6 +134,22 @@ public class V7GridFS {
 				contentType);
 	}
 
+	public ObjectId addFile(ContentPointer data, Object parentFileId,
+			String filename, String contentType) throws IOException {
+		if (data == null)
+			return addFile(null, 0, 0, parentFileId, filename, contentType);
+
+		ObjectId fileId = new ObjectId();
+		BasicDBObject metaData = new BasicDBObject("parent", parentFileId)
+				.append("_id", fileId);
+
+		metaData.putAll(storage.updateBackRefs(data, fileId, filename,
+				contentType));
+
+		insertMetaData(metaData);
+		return fileId;
+	}
+
 	public ObjectId addFile(byte[] data, int offset, int len,
 			Object parentFileId, String filename, String contentType)
 			throws IOException {
@@ -199,6 +215,29 @@ public class V7GridFS {
 	void updateContents(DBObject metaData, byte[] contents) throws IOException {
 		updateContents(metaData, contents, 0, contents == null ? 0
 				: contents.length);
+	}
+
+	void updateContents(DBObject metaData, ContentPointer newContents)
+			throws IOException {
+		ContentPointer oldContents = getContentPointer(metaData);
+
+		if (newContents.contentEquals(oldContents))
+			return;
+
+		String filename = (String) metaData.get("filename");
+		String contentType = (String) metaData.get("contentType");
+		Object fileId = metaData.get("_id");
+
+		BSONObject newContent = storage.updateBackRefs(newContents, fileId,
+				filename, contentType);
+
+		metaData.removeField("sha");
+		metaData.removeField("length");
+		metaData.removeField("in");
+
+		metaData.putAll(newContent);
+
+		updateMetaData(metaData);
 	}
 
 	/**

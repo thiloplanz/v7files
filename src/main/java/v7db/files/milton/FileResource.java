@@ -178,9 +178,9 @@ class FileResource implements GetableResource, PropFindableResource,
 		if (existing != null)
 			throw new ConflictException();
 		try {
-			// TODO: avoid copying the data, just copy the ContentPointer
-			newParent.createNew(name, file.getInputStream(), file.getLength(),
-					file.getContentType());
+			// avoid copying the data, just copy the ContentPointer
+			newParent.createNew(name, file.getContentPointer(), file
+					.getContentType());
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new ConflictException(this);
