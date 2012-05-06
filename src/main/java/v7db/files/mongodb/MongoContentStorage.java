@@ -21,6 +21,8 @@ import static v7db.files.mongodb.QueryUtils._ID;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -180,24 +182,74 @@ public class MongoContentStorage implements ContentStorage {
 		throw new UnsupportedOperationException(store);
 	}
 
+	/**
+	 * read into the buffer, continuing until the stream is finished or the
+	 * buffer is full.
+	 * 
+	 * @return the number of bytes read, which could be 0 (not -1)
+	 * @throws IOException
+	 */
+	private static int readFully(InputStream data, byte[] buffer)
+			throws IOException {
+		int read = data.read(buffer);
+		if (read == -1) {
+			return 0;
+		}
+		while (read < buffer.length) {
+			int added = data.read(buffer, read, buffer.length - read);
+			if (added == -1)
+				return read;
+			read += added;
+		}
+		return read;
+	}
+
 	public ContentSHA storeContent(InputStream data) throws IOException {
 		try {
-			// TODO: don't read it all at once, could be BIG !
-			return storeContent(IOUtils.toByteArray(data));
+			MessageDigest completeSHA = MessageDigest.getInstance("SHA");
+			long completeLength = 0;
+			byte[] chunk = new byte[chunkSize];
+			int read;
+			List<ContentSHA> chunks = new ArrayList<ContentSHA>();
+
+			while (0 < (read = readFully(data, chunk))) {
+				completeSHA.update(chunk, 0, read);
+				completeLength += read;
+				chunks.add(storeContentChunk(chunk, 0, read));
+			}
+			if (chunks.isEmpty())
+				return storeContentChunk(ArrayUtils.EMPTY_BYTE_ARRAY, 0, 0);
+
+			if (chunks.size() == 1)
+				return chunks.get(0);
+
+			List<Map<String, Object>> bases = new ArrayList<Map<String, Object>>(
+					chunks.size());
+			for (ContentSHA c : chunks) {
+				bases.add(c.serialize());
+			}
+			ContentSHA result = ContentSHA.forDigestAndLength(completeSHA
+					.digest(), completeLength);
+			contentCollection.insert(new BasicDBObject(_ID, result.getSHA())
+					.append("store", "cat").append("base", bases),
+					WriteConcern.SAFE);
+			return result;
+		} catch (NoSuchAlgorithmException e) {
+			throw new RuntimeException(e);
 		} finally {
 			IOUtils.closeQuietly(data);
 		}
 
 	}
 
-	private ContentSHA storeContent(byte[] bytes) throws IOException {
-		final int length = bytes.length;
-		ContentSHA _sha = ContentSHA.calculate(bytes);
+	private ContentSHA storeContentChunk(byte[] bytes, final int offset,
+			final int length) throws IOException {
+		ContentSHA _sha = ContentSHA.calculate(bytes, offset, length);
 		byte[] sha = _sha.getSHA();
 
 		long existing = contentCollection.count(new BasicDBObject(_ID, sha));
 		if (existing == 0) {
-			byte[] gzipped = Compression.gzip(bytes, 0, length);
+			byte[] gzipped = Compression.gzip(bytes, offset, length);
 			if (gzipped != null && gzipped.length > chunkSize)
 				gzipped = null;
 			if (gzipped != null) {
@@ -207,33 +259,14 @@ public class MongoContentStorage implements ContentStorage {
 						WriteConcern.SAFE);
 				gzipped = null;
 			} else {
-				if (length > chunkSize) {
-					storeChunkedContent(bytes, sha);
-					return _sha;
+				if (offset > 0 || bytes.length != length) {
+					bytes = ArrayUtils.subarray(bytes, offset, offset + length);
 				}
 				contentCollection.insert(new BasicDBObject(_ID, sha).append(
 						"in", bytes), WriteConcern.SAFE);
 			}
 		}
 		return _sha;
-	}
-
-	private void storeChunkedContent(byte[] data, byte[] sha)
-			throws IOException {
-		List<Map<String, Object>> chunks = new ArrayList<Map<String, Object>>(1
-				+ data.length / chunkSize);
-		int start = 0;
-		while (start < data.length) {
-			int end = start + chunkSize;
-			if (end > data.length) {
-				end = data.length;
-			}
-			byte[] chunk = ArrayUtils.subarray(data, start, end);
-			chunks.add(storeContent(chunk).serialize());
-			start = end;
-		}
-		contentCollection.insert(new BasicDBObject(_ID, sha).append("store",
-				"cat").append("base", chunks), WriteConcern.SAFE);
 	}
 
 	public ContentPointer storeContent(Map<String, Object> storageScheme)

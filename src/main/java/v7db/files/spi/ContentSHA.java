@@ -16,6 +16,7 @@
  */
 package v7db.files.spi;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -50,8 +51,21 @@ public final class ContentSHA implements ContentPointer {
 		return length;
 	}
 
+	public static ContentSHA forDigestAndLength(byte[] sha, long length) {
+		return new ContentSHA(sha.clone(), length);
+	}
+
 	public static ContentSHA calculate(byte[] data) {
 		return new ContentSHA(DigestUtils.sha(data), data.length);
+	}
+
+	public static ContentSHA calculate(byte[] data, int offset, int length) {
+		try {
+			return new ContentSHA(DigestUtils.sha(new ByteArrayInputStream(
+					data, offset, length)), length);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	public Map<String, Object> serialize() {
