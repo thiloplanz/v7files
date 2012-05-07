@@ -17,6 +17,7 @@
 package v7db.files.spi;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -69,5 +70,30 @@ public final class StoredContent implements ContentPointer {
 				return false;
 			}
 		return false;
+	}
+
+	public Content loadOrLazyLoad(final ContentStorage storage,
+			int loadAndCacheUntilLength) throws IOException {
+		if (length <= loadAndCacheUntilLength)
+			return storage.getContent(this);
+
+		return new Content() {
+
+			public InputStream getInputStream() throws IOException {
+				return storage.getContent(StoredContent.this).getInputStream();
+			}
+
+			public InputStream getInputStream(long offset, long length)
+					throws IOException {
+				return storage.getContent(StoredContent.this).getInputStream(
+						offset, length);
+			}
+
+			public long getLength() {
+				return length;
+			}
+
+		};
+
 	}
 }

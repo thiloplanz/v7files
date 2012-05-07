@@ -314,8 +314,9 @@ public class MongoContentStorage implements ContentStorage {
 			if (data.containsKey("in"))
 				return InlineContent.deserialize(data);
 			if (data.containsKey("sha")) {
-				return getContent(new StoredContent((byte[]) data.get("sha"),
-						MapUtils.getRequiredLong(data, "length")));
+				return new StoredContent((byte[]) data.get("sha"), MapUtils
+						.getRequiredLong(data, "length")).loadOrLazyLoad(this,
+						8 * 1024);
 			}
 			throw new UnsupportedOperationException(data.toString());
 		}
@@ -326,5 +327,4 @@ public class MongoContentStorage implements ContentStorage {
 
 		return s.getContent(this, data);
 	}
-
 }
