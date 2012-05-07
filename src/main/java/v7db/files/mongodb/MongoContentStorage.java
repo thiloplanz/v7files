@@ -168,6 +168,7 @@ public class MongoContentStorage implements ContentStorage {
 
 	}
 
+	@SuppressWarnings("unchecked")
 	private Content getContent(BSONObject data) throws IOException {
 		if (data == null)
 			return null;
@@ -230,9 +231,14 @@ public class MongoContentStorage implements ContentStorage {
 			}
 			ContentSHA result = ContentSHA.forDigestAndLength(completeSHA
 					.digest(), completeLength);
-			contentCollection.insert(new BasicDBObject(_ID, result.getSHA())
-					.append("store", "cat").append("base", bases),
-					WriteConcern.SAFE);
+			long existing = contentCollection.count(new BasicDBObject(_ID,
+					result.getSHA()));
+			if (existing == 0) {
+				contentCollection
+						.insert(new BasicDBObject(_ID, result.getSHA()).append(
+								"store", "cat").append("base", bases),
+								WriteConcern.SAFE);
+			}
 			return result;
 		} catch (NoSuchAlgorithmException e) {
 			throw new RuntimeException(e);

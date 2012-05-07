@@ -34,6 +34,7 @@ import org.bson.BasicBSONObject;
 
 import v7db.files.spi.Content;
 import v7db.files.spi.ContentPointer;
+import v7db.files.spi.ContentSHA;
 import v7db.files.spi.ContentStorage;
 
 import com.mongodb.Mongo;
@@ -160,5 +161,10 @@ public class MongoContentStorageTest extends MockMongoTestCaseSupport {
 		assertEquals(Hex.encodeHexString(sha), DigestUtils.shaHex(storage
 				.getContent(pointer).getInputStream()));
 
+		ContentSHA storeAgain = storage.storeContent(new ByteArrayInputStream(
+				data));
+		assertEquals(Hex.encodeHexString(sha), storeAgain.getDigest());
+
 	}
+
 }
