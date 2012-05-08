@@ -17,19 +17,14 @@
 
 package v7db.files;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
 import org.bson.types.ObjectId;
 
@@ -165,14 +160,11 @@ public class V7GridFS {
 		return fileId;
 	}
 
-	public ObjectId addFile(File data, Object parentFileId, String filename,
-			String contentType) throws IOException {
-		// avoid temporary files for small data
-		if (data != null && data.length() < 32 * 1024) {
-			byte[] smallData = FileUtils.readFileToByteArray(data);
-			return addFile(smallData, 0, smallData.length, parentFileId,
-					filename, contentType);
-		}
+	/**
+	 * will close the InputStream before returning
+	 */
+	public ObjectId addFile(InputStream data, Object parentFileId,
+			String filename, String contentType) throws IOException {
 		ObjectId fileId = new ObjectId();
 		BasicDBObject metaData = new BasicDBObject("parent", parentFileId)
 				.append("_id", fileId);
@@ -272,49 +264,12 @@ public class V7GridFS {
 				updateContents(metaData, IOUtils.toByteArray(contents, size));
 				return;
 			}
-			File temp = File.createTempFile("v7files-upload-", ".tmp");
-			try {
-				FileUtils.copyInputStreamToFile(contents, temp);
-				if (temp.length() != size)
-					throw new IOException("read incorrect number of bytes for "
-							+ metaData.get("filename") + ", expected " + size
-							+ " but got " + temp.length());
-				updateContents(metaData, temp);
-			} finally {
-				temp.delete();
-			}
-			return;
 		}
 
-		// read the first megabyte into a buffer
-		byte[] buffer = new byte[1024 * 1024];
-		int read = readFully(contents, buffer);
-		if (read == 0) {
-			updateContents(metaData, ArrayUtils.EMPTY_BYTE_ARRAY);
-			return;
-		}
-
-		// did it fit completely in the buffer?
-		if (read < buffer.length) {
-			updateContents(metaData, buffer, 0, read);
-			return;
-		}
-		// if not, copy to a temporary file
-		// so that we can calculate the SHA-1 first
-		File temp = File.createTempFile("v7files-upload-", ".tmp");
-		try {
-			OutputStream out = new FileOutputStream(temp);
-			out.write(buffer);
-			buffer = null;
-			IOUtils.copy(contents, out);
-			out.close();
-			updateContents(metaData, temp);
-		} finally {
-			temp.delete();
-		}
+		updateContents(metaData, contents);
 	}
 
-	private void updateContents(DBObject metaData, File contents)
+	private void updateContents(DBObject metaData, InputStream contents)
 			throws IOException {
 
 		Object fileId = metaData.get("_id");

@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
@@ -113,14 +114,18 @@ public class ContentStorageFacade {
 
 	}
 
-	public BSONObject insertContentsAndBackRefs(File data, Object fileId,
-			String filename, String contentType) throws IOException {
+	/**
+	 * will close the InputStream before returning
+	 */
+	public BSONObject insertContentsAndBackRefs(InputStream data,
+			Object fileId, String filename, String contentType)
+			throws IOException {
 
 		if (data == null)
 			return insertContentsAndBackRefs(null, 0, 0, fileId, filename,
 					contentType);
 
-		ContentPointer p = storage.storeContent(new FileInputStream(data));
+		ContentPointer p = storage.storeContent(data);
 
 		refTracking.updateReferences(fileId, p);
 
@@ -162,8 +167,8 @@ public class ContentStorageFacade {
 			File data, ObjectId fileId, String filename, String contentType)
 			throws IOException {
 		if (data == null || data.length() > inlineUntil)
-			return insertContentsAndBackRefs(data, fileId, filename,
-					contentType);
+			return insertContentsAndBackRefs(new FileInputStream(data), fileId,
+					filename, contentType);
 
 		refTracking.updateReferences(fileId);
 

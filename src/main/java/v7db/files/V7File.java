@@ -17,17 +17,12 @@
 
 package v7db.files;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
 
@@ -173,6 +168,10 @@ public class V7File {
 				throw new RuntimeException(e);
 			}
 		}
+		if (contentPointer.getLength() == 0)
+			return ContentSHA.calculate(ArrayUtils.EMPTY_BYTE_ARRAY)
+					.getDigest();
+
 		// TODO:
 		System.err.println("NO DIGEST!");
 		return null;
@@ -205,59 +204,13 @@ public class V7File {
 		return lazy(gridFS, childId, this);
 	};
 
-	public V7File createChild(File data, String filename, String contentType)
-			throws IOException {
-		Object childId = gridFS.addFile(data, getId(), filename, contentType);
-		return lazy(gridFS, childId, this);
-	}
-
-	public V7File createChild(InputStream data, long size, String filename,
-			String contentType) throws IOException {
-		if (size <= 1024 * 1024)
-			return createChild(IOUtils.toByteArray(data, size), filename,
-					contentType);
-
-		File temp = File.createTempFile("v7files-upload-", ".tmp");
-		try {
-			FileUtils.copyInputStreamToFile(data, temp);
-			if (temp.length() != size) {
-				throw new IOException("read incorrect number of bytes for "
-						+ filename + ", expected " + size + " but got "
-						+ temp.length());
-			}
-			return createChild(temp, filename, contentType);
-
-		} finally {
-			temp.delete();
-		}
-	}
-
 	public V7File createChild(InputStream data, String filename,
 			String contentType) throws IOException {
 		if (data == null)
 			return createChild(null, 0, 0, filename, contentType);
-		// read the first megabyte into a buffer
-		byte[] buffer = new byte[1024 * 1024];
-		int read = V7GridFS.readFully(data, buffer);
-		if (read == 0)
-			return createChild(ArrayUtils.EMPTY_BYTE_ARRAY, filename,
-					contentType);
-		// did it fit completely in the buffer?
-		if (read < buffer.length)
-			return createChild(buffer, 0, read, filename, contentType);
-		// if not, copy to a temporary file
-		// so that we can calculate the SHA-1 first
-		File temp = File.createTempFile("v7files-upload-", ".tmp");
-		try {
-			OutputStream out = new FileOutputStream(temp);
-			out.write(buffer);
-			buffer = null;
-			IOUtils.copy(data, out);
-			out.close();
-			return createChild(temp, filename, contentType);
-		} finally {
-			temp.delete();
-		}
+
+		Object childId = gridFS.addFile(data, getId(), filename, contentType);
+		return lazy(gridFS, childId, this);
 	}
 
 	public void rename(String newName) throws IOException {

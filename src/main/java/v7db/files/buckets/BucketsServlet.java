@@ -17,8 +17,6 @@
 
 package v7db.files.buckets;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -373,22 +371,13 @@ public class BucketsServlet extends HttpServlet {
 			HttpServletResponse response, BSONObject bucket) throws IOException {
 
 		byte[] sha;
-		File tempFile = File.createTempFile("echoPut_", ".tmp");
-		try {
-			FileOutputStream fos = new FileOutputStream(tempFile);
-			IOUtils.copy(request.getInputStream(), fos);
-			fos.close();
 
-			BSONObject content = storage.insertContentsAndBackRefs(tempFile,
-					new DBRef(null, bucketCollection.getName(), bucket
-							.get("_id")), null, null);
-			sha = (byte[]) content.get("sha");
-			if (sha == null) {
-				sha = ((InlineContent) storage.getContentPointer(content))
-						.getSHA();
-			}
-		} finally {
-			tempFile.delete();
+		BSONObject content = storage.insertContentsAndBackRefs(request
+				.getInputStream(), new DBRef(null, bucketCollection.getName(),
+				bucket.get("_id")), null, null);
+		sha = (byte[]) content.get("sha");
+		if (sha == null) {
+			sha = ((InlineContent) storage.getContentPointer(content)).getSHA();
 		}
 		response.setContentType("text/plain");
 		response.getWriter().write(Hex.encodeHexString(sha));
