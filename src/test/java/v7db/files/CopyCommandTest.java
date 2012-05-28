@@ -17,9 +17,7 @@
 package v7db.files;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 
 import jmockmongo.MockMongoTestCaseSupport;
 
@@ -31,17 +29,12 @@ import v7db.files.spi.ContentSHA;
 
 public class CopyCommandTest extends MockMongoTestCaseSupport {
 
-	private final ByteArrayOutputStream out = new ByteArrayOutputStream(10000);
-
-	private PrintStream realOut;
-
 	@Override
 	protected void setUp() throws Exception {
 		super.setUp();
 		UnitTestSupport.initConfiguration(UnitTestSupport
 				.getDefaultProperties());
-		realOut = System.out;
-		System.setOut(new PrintStream(out));
+
 	}
 
 	public void testSHA() throws IOException {
@@ -83,12 +76,6 @@ public class CopyCommandTest extends MockMongoTestCaseSupport {
 		V7File file = fs.getFile("x", "copy", "test.txt");
 		assertEquals("test", IOUtils.toString(file.getInputStream()));
 		assertEquals("text/plain", file.getContentType());
-	}
-
-	@Override
-	protected void tearDown() throws Exception {
-		System.setOut(realOut);
-		super.tearDown();
 	}
 
 }

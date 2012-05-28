@@ -43,7 +43,7 @@ class CopyCommand {
 		return storage.findContentPointerByPrefix(decodeSHAPrefix(shaPrefix));
 	}
 
-	private static V7File getParent(V7GridFS fs, String[] childPath)
+	static V7File getParent(V7GridFS fs, String[] childPath)
 			throws FileNotFoundException {
 		V7File parent = fs.getFile(ArrayUtils.subarray(childPath, 0,
 				childPath.length - 1));
@@ -67,7 +67,7 @@ class CopyCommand {
 		}
 	}
 
-	private static String[] getPath(String root, String path) {
+	static String[] getPath(String root, String path) {
 		List<String> t = new ArrayList<String>();
 		t.add(root);
 		t.addAll(Arrays.asList(StringUtils.split(path, "/")));
