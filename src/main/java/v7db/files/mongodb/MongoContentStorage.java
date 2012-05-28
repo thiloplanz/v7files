@@ -106,6 +106,38 @@ public class MongoContentStorage implements ContentStorage {
 		return getContent(contentCollection.findOne(sha));
 	}
 
+	public ContentSHA findContentPointerByPrefix(byte[] shaPrefix)
+			throws IOException {
+		if (shaPrefix.length == 20) {
+			DBObject file = contentCollection.findOne(shaPrefix);
+			if (file == null)
+				return null;
+			Content c = getContent(file);
+			return ContentSHA.forDigestAndLength(shaPrefix, c.getLength());
+		}
+
+		if (shaPrefix.length > 20)
+			throw new IllegalArgumentException();
+
+		byte[] lower = Arrays.copyOf(shaPrefix, 20); // 0-padded
+		byte[] higher = Arrays.copyOf(shaPrefix, 20); // FF-padded
+		for (int i = shaPrefix.length; i < higher.length; i++) {
+			higher[i] = (byte) 0xFF;
+		}
+		List<DBObject> files = contentCollection.find(
+				QueryUtils.between(_ID, lower, higher), new BasicDBObject())
+				.limit(2).toArray();
+		if (files.isEmpty())
+			return null;
+		if (files.size() == 1) {
+			Content c = getContent(files.get(0));
+			return ContentSHA.forDigestAndLength(
+					(byte[]) files.get(0).get(_ID), c.getLength());
+		}
+		throw new IllegalArgumentException(Hex.encodeHexString(shaPrefix)
+				+ " is not a unique SHA prefix");
+	}
+
 	public Content findContentByPrefix(byte[] shaPrefix) throws IOException {
 		if (shaPrefix.length == 20)
 			return getContent(shaPrefix);

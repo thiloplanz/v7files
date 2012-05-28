@@ -33,6 +33,25 @@ import com.mongodb.MongoException;
 
 class CatCommand {
 
+	static byte[] decodeSHAPrefix(String shaPrefix) throws DecoderException,
+			IOException {
+		byte[] id;
+		if (shaPrefix.startsWith("BinData(")) {
+			id = Base64.decodeBase64(StringUtils.substringBetween(shaPrefix,
+					",", ")"));
+		} else {
+			id = Hex.decodeHex(shaPrefix.toCharArray());
+		}
+		if (id.length > 20)
+			throw new DecoderException("too long");
+		return id;
+	}
+
+	private static Content findContentByPrefix(MongoContentStorage storage,
+			String shaPrefix) throws DecoderException, IOException {
+		return storage.findContentByPrefix(decodeSHAPrefix(shaPrefix));
+	}
+
 	public static void main(String[] args) throws MongoException, IOException {
 
 		if (args.length != 3) {
@@ -47,16 +66,7 @@ class CatCommand {
 					.getMongo().getDB(Configuration.getProperty("mongo.db")));
 			String sha = args[2];
 			try {
-				byte[] id;
-				if (sha.startsWith("BinData(")) {
-					id = Base64.decodeBase64(StringUtils.substringBetween(sha,
-							",", ")"));
-				} else {
-					id = Hex.decodeHex(sha.toCharArray());
-				}
-				if (id.length > 20)
-					throw new DecoderException("too long");
-				Content file = storage.findContentByPrefix(id);
+				Content file = findContentByPrefix(storage, sha);
 				if (file == null) {
 					System.err.println("file not found");
 					System.exit(1);

@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
+import org.bson.types.ObjectId;
 
 import v7db.files.spi.Content;
 import v7db.files.spi.ContentPointer;
@@ -221,6 +222,19 @@ public class V7File {
 	public void moveTo(Object newParentId, String newName) throws IOException {
 		metaData.put("parent", newParentId);
 		rename(newName);
+	}
+
+	public void copyTo(Object newParentId, String newName) throws IOException {
+		BasicDBObject newMetaData = new BasicDBObject();
+		ObjectId myNewId = new ObjectId();
+		newMetaData.put("_id", myNewId);
+		newMetaData.put("filename", newName);
+		newMetaData.put("parent", newParentId);
+		newMetaData.put("contentType", getContentType());
+		for (V7File child : getChildren()) {
+			child.copyTo(myNewId, child.getName());
+		}
+		gridFS.insertContents(newMetaData, getContentPointer());
 	}
 
 	public void setContent(ContentPointer data, String contentType)

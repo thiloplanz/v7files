@@ -37,6 +37,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
+import com.mongodb.WriteConcern;
 import com.mongodb.WriteResult;
 
 public class V7GridFS {
@@ -188,7 +189,7 @@ public class V7GridFS {
 	private void insertMetaData(DBObject metaData) throws IOException {
 		metaData.put("_version", 1);
 		metaData.put("created_at", new Date());
-		WriteResult result = files.insert(metaData);
+		WriteResult result = files.insert(WriteConcern.SAFE, metaData);
 		String error = result.getError();
 		if (error != null)
 			throw new IOException(error);
@@ -230,6 +231,27 @@ public class V7GridFS {
 		metaData.putAll(newContent);
 
 		updateMetaData(metaData);
+	}
+
+	void insertContents(DBObject metaData, ContentPointer newContents)
+			throws IOException {
+
+		String filename = (String) metaData.get("filename");
+		String contentType = (String) metaData.get("contentType");
+		Object fileId = metaData.get("_id");
+
+		if (newContents != null) {
+			BSONObject newContent = storage.updateBackRefs(newContents, fileId,
+					filename, contentType);
+
+			metaData.removeField("sha");
+			metaData.removeField("length");
+			metaData.removeField("in");
+
+			metaData.putAll(newContent);
+		}
+
+		insertMetaData(metaData);
 	}
 
 	/**

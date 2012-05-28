@@ -25,7 +25,7 @@ public final class ChunkedContent implements Content {
 
 	private final Content[] chunks;
 
-	public ChunkedContent(Content... chunks) {
+	ChunkedContent(Content... chunks) {
 		this.chunks = ArrayUtils.clone(chunks);
 	}
 
