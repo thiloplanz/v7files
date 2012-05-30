@@ -1,10 +1,12 @@
 # v7files
 
-v7files is a WebDAV server backed by MongoDB GridFS file storage.
+v7files is a file server backed by MongoDB.
+It can be used as a WebDAV server, as well as the file storage backend for other web applications.
 
 It is written in Java, using the Jetty embedded web server and the Milton WebDAV library.
 
-All file contents are stored in GridFS, but the file (and folder) metadata is [stored in separate collection](https://github.com/thiloplanz/v7files/wiki/StorageFormat),
+All file contents and meta data are stored inside of MongoDB.
+File contents use a technique very similar to GridFS, but the file (and folder) metadata is [stored in a separate collection](https://github.com/thiloplanz/v7files/wiki/StorageFormat),
 where it can also be versioned. Identical content is only stored once, even if more than one file refers (or used to refer) to it, 
 and content can also be compressed using zip compression (good for text files) or delta storage (good for files that are similar to others).
 
@@ -14,6 +16,11 @@ You can configure [Authentication](https://github.com/thiloplanz/v7files/wiki/Au
 ## Online documentation
 
 For more, detailed, and up-to-date information, see [the project wiki](https://github.com/thiloplanz/v7files/wiki/).
+
+## Installation
+
+There has not been a release build yet. You will have to [compile
+v7files from its source code, using Maven](https://github.com/thiloplanz/v7files/wiki/Installation).
 
 ## Usage
 

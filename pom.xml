@@ -77,8 +77,8 @@
 			<url>http://www.ettrema.com/maven2</url>
 		</repository>
 		<repository>
-			<id>thiloplanz-snapshot</id>
-			<url>http://repository-thiloplanz.forge.cloudbees.com/snapshot/</url>
+			<id>thiloplanz</id>
+			<url>http://repository-thiloplanz.forge.cloudbees.com/release/</url>
 		</repository>
 	</repositories>
 
@@ -217,7 +217,7 @@
 		<dependency>
 			<groupId>jmockmongo</groupId>
 			<artifactId>jmockmongo</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>0.0.1</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
