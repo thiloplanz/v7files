@@ -45,8 +45,10 @@ public class V7GridFS {
 
 	private final ContentStorageFacade storage;
 
+	public static final String COLLECTION_NAME_FILES = "v7files.files";
+
 	public V7GridFS(DB db) {
-		files = db.getCollection("v7files.files");
+		files = db.getCollection(COLLECTION_NAME_FILES);
 		storage = new ContentStorageFacade(new MongoContentStorage(db),
 				new MongoReferenceTracking(db));
 	}

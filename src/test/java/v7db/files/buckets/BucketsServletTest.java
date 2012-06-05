@@ -34,6 +34,7 @@ import v7db.files.spi.ContentSHA;
 import com.meterware.httpunit.GetMethodWebRequest;
 import com.meterware.httpunit.HttpException;
 import com.meterware.httpunit.HttpNotFoundException;
+import com.meterware.httpunit.PostMethodWebRequest;
 import com.meterware.httpunit.PutMethodWebRequest;
 import com.meterware.httpunit.WebRequest;
 import com.meterware.httpunit.WebResponse;
@@ -65,7 +66,7 @@ public class BucketsServletTest extends MockMongoTestCaseSupport {
 			String POST, String PUT) {
 		BasicBSONObject o = new BasicBSONObject("_id", bucketId).append("GET",
 				GET).append("POST", POST).append("PUT", PUT);
-		prepareMockData("test.v7.buckets", o);
+		prepareMockData("test.v7files.buckets", o);
 		return o;
 	}
 
@@ -244,4 +245,38 @@ public class BucketsServletTest extends MockMongoTestCaseSupport {
 
 	}
 
+	public void testFormPostPOST() throws IOException, SAXException {
+
+		ServletUnitClient sc = sr.newClient();
+		{
+			PostMethodWebRequest request = new PostMethodWebRequest(
+					"http://test/myServlet/1");
+
+			try {
+				sc.getResponse(request);
+				fail("bucket not found => 404");
+			} catch (HttpNotFoundException e) {
+				assertEquals("Bucket '1' not found", e.getResponseMessage());
+			}
+
+		}
+
+		prepareBucket("1", "FormPost", null, null);
+		{
+			PostMethodWebRequest request = new PostMethodWebRequest(
+					"http://test/myServlet/1");
+
+			try {
+				sc.getResponse(request);
+				fail("uploads not allowed => 405");
+			} catch (HttpException e) {
+				assertEquals(HttpServletResponse.SC_METHOD_NOT_ALLOWED, e
+						.getResponseCode());
+			}
+		}
+		//
+		// TODO: an actual POST, see
+		// http://stackoverflow.com/questions/10891247/file-upload-post-request-with-servletunit
+
+	}
 }

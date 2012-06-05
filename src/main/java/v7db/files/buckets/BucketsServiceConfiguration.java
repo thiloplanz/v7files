@@ -51,7 +51,7 @@ public class BucketsServiceConfiguration {
 	}
 
 	public DBCollection getBucketCollection() {
-		return db.getCollection("v7.buckets");
+		return db.getCollection("v7files.buckets");
 	}
 
 	public ContentStorageFacade getContentStorage() {
