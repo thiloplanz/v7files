@@ -27,6 +27,9 @@ import org.apache.commons.io.IOUtils;
 import org.bson.BasicBSONObject;
 import org.bson.types.ObjectId;
 
+import v7db.files.mongodb.V7File;
+import v7db.files.mongodb.V7GridFS;
+
 public class V7GridFSTest extends MockMongoTestCaseSupport {
 
 	private V7GridFS gridFS;

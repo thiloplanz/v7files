@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files;
+package v7db.files.mongodb;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -291,7 +291,7 @@ public class V7File {
 		return acl.toArray();
 	}
 
-	Object[] getAcl(String permission) {
+	public Object[] getAcl(String permission) {
 		BSONObject acls = (BSONObject) metaData.get("acl");
 		if (acls == null)
 			return null;

@@ -19,7 +19,7 @@ package v7db.files.milton;
 
 import java.util.Properties;
 
-import v7db.files.Tenants;
+import v7db.files.mongodb.Tenants;
 
 import com.bradmcevoy.http.AuthenticationService;
 import com.bradmcevoy.http.ResourceFactory;

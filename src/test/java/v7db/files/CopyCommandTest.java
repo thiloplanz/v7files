@@ -25,6 +25,8 @@ import org.apache.commons.io.IOUtils;
 import org.bson.types.ObjectId;
 
 import v7db.files.mongodb.MongoContentStorage;
+import v7db.files.mongodb.V7File;
+import v7db.files.mongodb.V7GridFS;
 import v7db.files.spi.ContentSHA;
 
 public class CopyCommandTest extends MockMongoTestCaseSupport {

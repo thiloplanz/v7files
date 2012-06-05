@@ -17,6 +17,8 @@
 
 package v7db.files;
 
+import v7db.files.mongodb.AuthorisationProviderTest;
+
 public class AclAuthorisationProviderTest extends AuthorisationProviderTest {
 
 	public AclAuthorisationProviderTest() {

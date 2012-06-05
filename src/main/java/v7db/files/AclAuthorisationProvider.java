@@ -22,6 +22,7 @@ import java.util.Properties;
 import org.apache.commons.lang3.ArrayUtils;
 
 import v7db.auth.AuthenticationToken;
+import v7db.files.mongodb.V7File;
 
 class AclAuthorisationProvider implements AuthorisationProvider {
 

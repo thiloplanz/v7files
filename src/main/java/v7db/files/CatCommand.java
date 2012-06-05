@@ -27,6 +27,8 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import v7db.files.mongodb.MongoContentStorage;
+import v7db.files.mongodb.V7File;
+import v7db.files.mongodb.V7GridFS;
 import v7db.files.spi.Content;
 
 import com.mongodb.MongoException;

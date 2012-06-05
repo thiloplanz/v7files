@@ -15,13 +15,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files;
+package v7db.files.mongodb;
 
-import static v7db.files.Vermongo._VERSION;
+import static v7db.files.mongodb.Vermongo._VERSION;
 
 import com.mongodb.DBObject;
 
-class UpdateConflictException extends Exception {
+public class UpdateConflictException extends Exception {
 
 	private static final long serialVersionUID = 1L;
 

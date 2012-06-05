@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files;
+package v7db.files.mongodb;
 
 import java.util.Properties;
 

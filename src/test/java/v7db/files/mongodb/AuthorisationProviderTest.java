@@ -15,12 +15,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files;
+package v7db.files.mongodb;
 
 import java.util.Properties;
 
 import junit.framework.TestCase;
 import v7db.auth.AuthenticationToken;
+import v7db.files.AuthorisationProvider;
+import v7db.files.AuthorisationProviderFactory;
+import v7db.files.mongodb.V7File;
 
 import com.mongodb.BasicDBObject;
 

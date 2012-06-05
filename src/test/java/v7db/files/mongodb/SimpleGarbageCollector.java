@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 
-import v7db.files.BSONUtils;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;

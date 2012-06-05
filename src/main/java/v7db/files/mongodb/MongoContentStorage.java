@@ -35,7 +35,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
 
-import v7db.files.BSONUtils;
 import v7db.files.Compression;
 import v7db.files.MapUtils;
 import v7db.files.ZipFile;

@@ -18,6 +18,9 @@ package v7db.files;
 
 import java.io.IOException;
 
+import v7db.files.mongodb.V7File;
+import v7db.files.mongodb.V7GridFS;
+
 import jmockmongo.MockMongoTestCaseSupport;
 
 public class MkdirCommandTest extends MockMongoTestCaseSupport {

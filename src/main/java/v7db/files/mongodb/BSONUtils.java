@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files;
+package v7db.files.mongodb;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,7 +41,7 @@ import org.bson.BSONObject;
 
 public class BSONUtils {
 
-	static <T> T notNull(T x) {
+	public static <T> T notNull(T x) {
 		if (x == null)
 			return x;
 		if (x instanceof Map<?, ?>) {
@@ -72,7 +72,7 @@ public class BSONUtils {
 
 	}
 
-	static Object get(BSONObject b, String fieldName) {
+	public static Object get(BSONObject b, String fieldName) {
 		if (!fieldName.contains("."))
 			return notNull(b.get(fieldName));
 		String[] path = StringUtils.split(fieldName, ".", 2);
@@ -93,7 +93,7 @@ public class BSONUtils {
 		return x;
 	}
 
-	static Long toLong(Object x) {
+	public static Long toLong(Object x) {
 		if (x == null)
 			return null;
 		if (x instanceof Long)
@@ -119,7 +119,7 @@ public class BSONUtils {
 				+ "` into a Long");
 	}
 
-	static String toString(Object x) {
+	public static String toString(Object x) {
 		if (x == null)
 			return null;
 		if (x instanceof String)

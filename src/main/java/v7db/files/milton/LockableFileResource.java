@@ -19,7 +19,7 @@ package v7db.files.milton;
 
 import org.bson.types.ObjectId;
 
-import v7db.files.V7File;
+import v7db.files.mongodb.V7File;
 
 import com.bradmcevoy.http.LockInfo;
 import com.bradmcevoy.http.LockResult;

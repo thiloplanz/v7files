@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import v7db.files.Configuration;
-import v7db.files.Tenants;
+import v7db.files.mongodb.Tenants;
 
 import com.bradmcevoy.http.ApplicationConfig;
 import com.bradmcevoy.http.HttpManager;

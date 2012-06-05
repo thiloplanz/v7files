@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package v7db.files;
+package v7db.files.mongodb;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,8 +28,7 @@ import org.apache.commons.io.IOUtils;
 import org.bson.BSONObject;
 import org.bson.types.ObjectId;
 
-import v7db.files.mongodb.MongoContentStorage;
-import v7db.files.mongodb.MongoReferenceTracking;
+import v7db.files.ContentStorageFacade;
 import v7db.files.spi.Content;
 import v7db.files.spi.ContentPointer;
 

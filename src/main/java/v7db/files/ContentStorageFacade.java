@@ -29,6 +29,7 @@ import org.bson.BSONObject;
 import org.bson.BasicBSONObject;
 import org.bson.types.ObjectId;
 
+import v7db.files.mongodb.BSONUtils;
 import v7db.files.spi.Content;
 import v7db.files.spi.ContentPointer;
 import v7db.files.spi.ContentStorage;

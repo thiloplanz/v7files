@@ -18,6 +18,7 @@
 package v7db.files;
 
 import v7db.auth.AuthenticationToken;
+import v7db.files.mongodb.V7File;
 
 public interface AuthorisationProvider {
 

@@ -16,8 +16,8 @@
  */
 package v7db.files;
 
-import static v7db.files.BSONUtils.notNull;
-import static v7db.files.BSONUtils.toLong;
+import static v7db.files.mongodb.BSONUtils.notNull;
+import static v7db.files.mongodb.BSONUtils.toLong;
 
 import java.util.Arrays;
 import java.util.List;
@@ -26,6 +26,8 @@ import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.BSONObject;
+
+import v7db.files.mongodb.BSONUtils;
 
 /**
  * Just like BSONUtils, but for Maps.

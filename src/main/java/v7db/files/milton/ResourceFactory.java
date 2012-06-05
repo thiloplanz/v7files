@@ -32,8 +32,8 @@ import v7db.auth.MongoAuthenticationProvider;
 import v7db.files.AuthorisationProvider;
 import v7db.files.AuthorisationProviderFactory;
 import v7db.files.Configuration;
-import v7db.files.V7File;
-import v7db.files.V7GridFS;
+import v7db.files.mongodb.V7File;
+import v7db.files.mongodb.V7GridFS;
 
 import com.bradmcevoy.http.ApplicationConfig;
 import com.bradmcevoy.http.Auth;

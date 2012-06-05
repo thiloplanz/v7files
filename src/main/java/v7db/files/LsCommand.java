@@ -25,6 +25,9 @@ import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import v7db.files.mongodb.V7File;
+import v7db.files.mongodb.V7GridFS;
+
 import com.mongodb.MongoException;
 
 class LsCommand {

@@ -23,6 +23,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import v7db.auth.AuthenticationToken;
+import v7db.files.mongodb.V7File;
 
 class GlobalAuthorisationProvider implements AuthorisationProvider {
 

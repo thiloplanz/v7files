@@ -22,9 +22,9 @@ import java.util.Properties;
 
 import v7db.files.Configuration;
 import v7db.files.ContentStorageFacade;
-import v7db.files.Tenants;
 import v7db.files.mongodb.MongoContentStorage;
 import v7db.files.mongodb.MongoReferenceTracking;
+import v7db.files.mongodb.Tenants;
 
 import com.mongodb.DB;
 import com.mongodb.DBCollection;

@@ -22,7 +22,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import v7db.files.V7File;
+import v7db.files.mongodb.V7File;
 import v7db.files.spi.ContentPointer;
 
 import com.bradmcevoy.http.CollectionResource;
