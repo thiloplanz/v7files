@@ -83,14 +83,11 @@ public class MiltonServletTest extends MockMongoTestCaseSupport {
 		}
 		assertExists(sc, "http://test/myServlet/1/test.txt");
 
-		// TODO: MOVE needs more update support from jMockMongo
-
 		{
 			WebRequest request = new MoveWebRequest("http://test/myServlet/1",
 					"/myServlet/2");
-			// WebResponse resp = sc.getResponse(request);
-			// assertEquals(HttpServletResponse.SC_CREATED,
-			// resp.getResponseCode());
+			WebResponse resp = sc.getResponse(request);
+			assertEquals(HttpServletResponse.SC_CREATED, resp.getResponseCode());
 		}
 
 	}

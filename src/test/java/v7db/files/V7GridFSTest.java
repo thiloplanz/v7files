@@ -43,11 +43,6 @@ public class V7GridFSTest extends MockMongoTestCaseSupport {
 		gridFS = new V7GridFS(getMongo().getDB("test"));
 	}
 
-	@Override
-	protected void tearDown() throws Exception {
-		super.tearDown();
-	}
-
 	private void testSimpleScenario(byte[] fileData) throws IOException {
 
 		// insert
@@ -68,15 +63,14 @@ public class V7GridFSTest extends MockMongoTestCaseSupport {
 		assertEquals(1, files.size());
 
 		// update
-		// TODO: jmockmongo needs findAndModify first
 
-		// file.setContent("updated contents".getBytes(), "text/plain");
-		//
-		// file = gridFS.getFile("root", "test.dat");
-		// assertEquals("test.dat", file.getName());
-		// assertEquals("text/plain", file.getContentType());
-		// assertEquals("updated contents", IOUtils
-		// .toString(file.getInputStream()));
+		file.setContent("updated contents".getBytes(), "text/plain");
+
+		file = gridFS.getFile("root", "test.dat");
+		assertEquals("test.dat", file.getName());
+		assertEquals("text/plain", file.getContentType());
+		assertEquals("updated contents", IOUtils
+				.toString(file.getInputStream()));
 
 		// delete
 		file.delete();

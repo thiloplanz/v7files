@@ -29,6 +29,7 @@ import jmockmongo.MockMongoTestCaseSupport;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BSONObject;
 import org.bson.BasicBSONObject;
 
@@ -132,13 +133,12 @@ public class MongoContentStorageTest extends MockMongoTestCaseSupport {
 		assertEquals(new String(data), IOUtils.toString(storage
 				.findContentByPrefix(sha).getInputStream()));
 
-		// TODO (needs range queries in jmockmongo)
-		// assertEquals(new String(data), IOUtils.toString(storage
-		// .findContentByPrefix(ArrayUtils.subarray(sha, 0, 5))
-		// .getInputStream()));
+		assertEquals(new String(data), IOUtils.toString(storage
+				.findContentByPrefix(ArrayUtils.subarray(sha, 0, 5))
+				.getInputStream()));
 
-		// assertNull(storage.findContentByPrefix(new byte[] { 0, 0, 0, 0 }));
-		// mongo.close();
+		assertNull(storage.findContentByPrefix(new byte[] { 0, 0, 0, 0 }));
+		mongo.close();
 	}
 
 	public void testSaveAsChunks() throws IOException {

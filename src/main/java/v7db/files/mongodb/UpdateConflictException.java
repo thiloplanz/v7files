@@ -21,7 +21,7 @@ import static v7db.files.mongodb.Vermongo._VERSION;
 
 import com.mongodb.DBObject;
 
-public class UpdateConflictException extends Exception {
+class UpdateConflictException extends Exception {
 
 	private static final long serialVersionUID = 1L;
 
